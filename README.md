@@ -7,20 +7,24 @@ A 3D Dragon Ball Z fighting game built for **Cephas Emokpae**.
 Nothing to install. It runs in any modern browser — phone, tablet, laptop or
 desktop — and once it has loaded once it works with no internet at all.
 
-<p align="center">
-  <img src="qr/qr-play.png" width="220" alt="QR code to play Dragon Ball Z: Saiyan Cephas">
-</p>
+<table align="center">
+<tr>
+  <td align="center"><img src="qr/qr-play.png" width="200" alt="QR code to play online"><br><b>Scan to play</b></td>
+  <td align="center"><img src="qr/qr-download.png" width="200" alt="QR code to download the offline copy"><br><b>Scan to download<br>the offline copy</b></td>
+</tr>
+</table>
 
 ---
 
-## Four ways to play
+## Five ways to play
 
 | | How | Best for |
 |---|---|---|
 | **1. Scan the QR code** | Point a phone camera at the code above (or at `qr/qr-play.png`). Tap the link. | Handing a phone to a kid |
 | **2. Open the link** | <https://leosaiyanx.github.io/dragon_ball_z_saiyan_cephas/> | Anything with a browser |
 | **3. Install it like an app** | Open the link, then **Add to Home Screen** (iPhone: Share → Add to Home Screen. Android/Chrome: ⋮ → Install app. Desktop Chrome/Edge: the ⊕ install icon in the address bar). | Full screen, no browser bars, works offline |
-| **4. Download one file** | Grab **[`dist/SaiyanCephas-standalone.html`](dist/SaiyanCephas-standalone.html)** — the *whole game* in a single 1 MB file. Double-click it. | No internet at all, or keeping a permanent copy |
+| **4. Download one file** | [**Download `SaiyanCephas-standalone.html`**](https://github.com/leosaiyanx/dragon_ball_z_saiyan_cephas/releases/latest/download/SaiyanCephas-standalone.html) — the *whole game* in a single 1 MB file. Double-click it and it plays. Email it, AirDrop it, put it on a USB stick. | No internet at all, or keeping a permanent copy |
+| **5. Send it to someone** | That same single file is the easiest thing to share — one attachment, no instructions, works on any computer. | Grandparents, cousins, school |
 
 There is also **[`PRINT_ME.html`](PRINT_ME.html)** — open it and print it for a
 card with the QR code and the controls, good for sticking on a wall.
@@ -82,7 +86,7 @@ Pick **2 Players** for split screen on one keyboard. Player 2 uses
   Kais, King Kai's tiny planet, a ruined city, Hell, and more. The ground is
   **destructible** — slams and beams punch real craters into the terrain that
   you then fight around.
-- **Story Mode** — 9 sagas, **62 fights**, from Raditz landing on Earth to the
+- **Story Mode** — 9 sagas, **50 fights**, from Raditz landing on Earth to the
   last stand against Jiren.
 - **Versus, 2-Player split screen, World Tournament, Survival and Training.**
 - **Real combat** — 5-hit combos into launchers, ki blasts, chargeable beams,

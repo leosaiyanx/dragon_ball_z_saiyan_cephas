@@ -534,18 +534,24 @@
     });
     filters.appendChild(favChip);
 
+    /* Two columns on a wide screen: the detail card stays put on the left
+       while the roster scrolls on the right. Stacked on narrow screens. */
+    var wrap = el('div', 'selWrap');
     var detail = el('div', 'detail');
+    var main = el('div', 'selMain');
     var grid = el('div', 'grid');
-    h.body.appendChild(detail);
-    h.body.appendChild(filters);
-    h.body.appendChild(grid);
+    main.appendChild(filters);
+    main.appendChild(grid);
+    wrap.appendChild(detail);
+    wrap.appendChild(main);
+    h.body.appendChild(wrap);
 
     function renderDetail() {
       var c = R.get(state.pick);
       clear(detail);
       var left = el('div');
       var pc = U.portrait(c, 220);
-      pc.style.cssText = 'width:100%;max-width:210px;border-radius:0.5em;display:block;';
+      pc.style.cssText = 'width:100%;max-width:150px;border-radius:0.5em;display:block;margin:0 auto;';
       left.appendChild(pc);
       var fav = el('button', 'btn ghost', (C.load().favorites.indexOf(c.id) >= 0 ? '★ Favourite' : '☆ Add favourite'));
       fav.style.cssText = 'margin-top:0.5em;width:100%;font-size:0.82em;';

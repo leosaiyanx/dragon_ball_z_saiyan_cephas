@@ -142,7 +142,7 @@ html = """<!DOCTYPE html>
     <code>dist/SaiyanCephas-standalone.html</code> from the repository.
   </div>
 
-  <footer>79 fighters &middot; 152 forms &middot; 12 arenas &middot; 62 story fights
+  <footer>79 fighters &middot; 152 forms &middot; 12 arenas &middot; 50 story fights
   &middot; Dragon Ball Z, GT, Super and the movies</footer>
 </div>
 </body>

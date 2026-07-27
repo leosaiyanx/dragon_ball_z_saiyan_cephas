@@ -1020,17 +1020,47 @@ h3 {
   font-weight: 900;
 }
 
+/* roster layout: detail card pinned left, grid scrolling right */
+.selWrap {
+  display: grid;
+  grid-template-columns: minmax(0, 17em) minmax(0, 1fr);
+  gap: 0.8em;
+  align-items: start;
+}
+
+.selMain {
+  min-width: 0;
+}
+
+/* Only stack on a genuinely narrow screen. On a phone held sideways two
+   columns still beat burying the roster under a full-height detail card. */
+@media (max-width: 620px) {
+  .selWrap {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* character detail panel */
 .detail {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
-  gap: 1em;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr);
+  gap: 0.9em;
   align-items: start;
   background: rgba(8, 12, 26, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 0.7em;
-  padding: 0.9em;
-  margin-bottom: 0.8em;
+  padding: 0.75em;
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 8.5em);
+  overflow-y: auto;
+  font-size: 0.94em;
+}
+
+@media (min-width: 621px) {
+  .detail {
+    grid-template-columns: 1fr;
+  }
 }
 
 .detail h3 {

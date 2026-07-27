@@ -4616,9 +4616,9 @@ var DBZ = (function () {
             /* sweep everything backward into one blade */
             a = -Math.PI / 2 + (i / Math.max(1, count - 1) - 0.5) * 1.5;
           }
-          var len = h.len * hr * (h.style === 'flame' ? (6.2 - r * 1.0) : (4.5 - r * 0.6)) *
-            (0.82 + 0.36 * M.hash1(i * 3.1 + r * 7.7));
-          var rad = hr * (h.style === 'flame' ? 0.30 : 0.27) * thick * (1 - r * 0.10);
+          var len = h.len * hr * (h.style === 'flame' ? (7.6 - r * 1.2) : (5.9 - r * 0.75)) *
+            (0.84 + 0.34 * M.hash1(i * 3.1 + r * 7.7));
+          var rad = hr * (h.style === 'flame' ? 0.34 : 0.31) * thick * (1 - r * 0.09);
           spike = spikeAt(a, phi, len, lift * (1 + r * 0.15), rad, (tip && r === 0) ? tm : hm);
           if (h.style === 'flame') spike.rotation.z += 0.0;
         }
@@ -4976,27 +4976,34 @@ var DBZ = (function () {
 
     function sleeves(material, len) {
       [rig.armL, rig.armR].forEach(function (a) {
-        var sl = tube(a, material, P.armR * 1.30, P.armR * 1.42, P.upperArm * len, 8);
+        var sl = tube(a, material, P.armR * 1.42, P.armR * 1.56, P.upperArm * len, 8);
         sl.position.y = -P.upperArm * len * 0.5;
         out.clothParts.push(sl);
       });
     }
 
+    /* Trousers cover the thigh AND the top of the shin, so the boot has
+       something to tuck into instead of leaving a band of bare knee. */
     function pants(material, len) {
       [rig.legL, rig.legR].forEach(function (l) {
-        var pl = tube(l, material, P.legR * 1.18, P.legR * 1.32, P.thigh * len, 8);
+        var pl = tube(l, material, P.legR * 1.30, P.legR * 1.48, P.thigh * len, 8);
         pl.position.y = -P.thigh * len * 0.5;
+      });
+      [rig.shinL, rig.shinR].forEach(function (sn) {
+        var cuff = tube(sn, material, P.legR * 1.44, P.legR * 1.30, P.shin * 0.62, 8);
+        cuff.position.y = -P.shin * 0.28;
       });
     }
 
     function boots(material, high, bandMat) {
       var hi = high || 0.8;
       [rig.shinL, rig.shinR].forEach(function (s) {
-        var bt = tube(s, material, P.legR * 1.12, P.legR * 1.24, P.shin * hi, 8);
-        bt.position.y = -P.shin * hi * 0.5;
+        var bt = tube(s, material, P.legR * 1.36, P.legR * 1.28, P.shin * hi, 8);
+        bt.position.y = -P.shin + P.shin * hi * 0.5;
         if (bandMat) {
-          var band = tube(s, bandMat, P.legR * 1.18, P.legR * 1.18, P.shin * 0.14, 8);
-          band.position.y = -P.shin * hi + P.shin * 0.07;
+          /* the cuff sits at the TOP of the boot, at mid-calf */
+          var band = tube(s, bandMat, P.legR * 1.42, P.legR * 1.42, P.shin * 0.12, 8);
+          band.position.y = -P.shin + P.shin * hi - P.shin * 0.02;
         }
       });
       [rig.footL, rig.footR].forEach(function (ft) {
@@ -5004,19 +5011,42 @@ var DBZ = (function () {
       });
     }
 
+    /* A sash rides the narrowest point of the waist, not the hip bone. Made
+       wide on purpose: it is the break between gi top and gi trousers, and
+       without it the whole fighter reads as one orange tube. */
     function belt(material, r) {
-      var b = m_(torus(0.30, 14), material, rig.torso);
-      b.scale.set(W * (r || 0.60), W * (r || 0.60), W * (r || 0.60) * 0.74);
+      var rr = W * (r || 0.60);
+      var b = m_(torus(0.46, 18), material, rig.torso);
+      b.scale.set(rr, rr, rr * 0.76);
       b.rotation.x = Math.PI / 2;
-      b.position.y = -torsoTop * 0.30;
+      b.position.y = torsoTop * 0.22;
+      /* the knot, tied off to one side */
+      var knot = ellip(rig.torso, material, rr * 0.34, rr * 0.30, rr * 0.26,
+        rr * 0.42, torsoTop * 0.20, rr * 0.62);
+      knot.rotation.z = 0.4;
+      return b;
     }
 
+    /* the coloured undershirt showing at the collar and down the front */
+    function collar(material) {
+      var c = ellip(rig.chest, material, W * 0.40, W * 0.16, W * 0.34,
+        0, torsoTop * 0.58, W * 0.16);
+      var v = m_(cone(6), material, rig.chest);
+      v.scale.set(W * 0.30, W * 0.42, W * 0.22);
+      v.position.set(0, torsoTop * 0.40, W * 0.34);
+      v.rotation.x = Math.PI;
+      return c;
+    }
+
+    /* Pads sit on the chest node at the real shoulder height. They used to be
+       pinned to the torso at 0.44 of its length — the middle of the ribcage. */
     function shoulderPads(material, big) {
-      [[-1, rig.torso], [1, rig.torso]].forEach(function (s) {
-        var pad = m_(sph(10), material, s[1]);
+      [-1, 1].forEach(function (side) {
+        var pad = m_(sph(10), material, rig.chest);
         var k = big ? 1.0 : 0.78;
-        pad.scale.set(W * 0.44 * k, W * 0.34 * k, W * 0.40 * k);
-        pad.position.set(s[0] * W * 0.92, torsoTop * 0.44, 0);
+        pad.scale.set(W * 0.46 * k, W * 0.36 * k, W * 0.42 * k);
+        pad.position.set(side * P.shoulderX * 0.96, torsoTop * 0.56, 0);
+        pad.rotation.z = -side * 0.22;
       });
     }
 
@@ -5049,18 +5079,19 @@ var DBZ = (function () {
     switch (kind) {
       case 'gi':
         if (!f.sleeveless) sleeves(c1, 0.98); else sleeves(c1, 0.28);
-        shell(c1, 1.03);
+        shell(c1, 1.09);
         if (f.shirt) shell(ownMat(f.shirt), 0.99, -torsoTop * 0.08);
-        belt(ownMat(f.belt || f.c2), 0.62);
+        collar(ownMat(f.c2));
+        belt(ownMat(f.belt || f.c2), 0.60);
         pants(c1, 1.0);
-        boots(ownMat(f.boots || f.c2), 0.74, ownMat(f.c3));
+        boots(ownMat(f.boots || f.c2), 0.52, ownMat(f.c3));
         wrist(ownMat(f.c3));
         if (f.kanji) {
-          var k1 = plate(rig.torso, ownMat(f.c2), W * 0.42, W * 0.42, W * 0.06, W * 0.42, torsoTop * 0.30, W * 0.74);
+          var k1 = plate(rig.chest, ownMat(f.c2), W * 0.38, W * 0.38, W * 0.06, W * 0.34, torsoTop * 0.16, W * 0.52);
           k1.rotation.y = -0.2;
         }
         if (f.pride) {
-          plate(rig.torso, c2, W * 1.5, W * 0.16, W * 0.1, 0, torsoTop * 0.30, W * 0.76);
+          plate(rig.chest, c2, W * 1.3, W * 0.14, W * 0.1, 0, torsoTop * 0.14, W * 0.55);
         }
         break;
 
@@ -5069,11 +5100,11 @@ var DBZ = (function () {
         var suit = ownMat(f.suit || 0x2b3a6b);
         sleeves(suit, 1.0);
         pants(suit, 1.0);
-        shell(suit, 1.0);
+        shell(suit, 1.07);
         var plateM = c1;
-        var chest = shell(plateM, 1.10, torsoTop * 0.12);
+        var chest = shell(plateM, 1.16, torsoTop * 0.12);
         chest.scale.y *= 0.72;
-        var abs = shell(ownMat(f.c3), 1.02, -torsoTop * 0.16);
+        var abs = shell(ownMat(f.c3), 1.08, -torsoTop * 0.16);
         abs.scale.y *= 0.55;
         if (f.shoulders) shoulderPads(plateM, true);
         if (f.skirt) {
@@ -5084,12 +5115,12 @@ var DBZ = (function () {
         }
         boots(plateM, 0.85);
         wrist(plateM);
-        plate(rig.torso, c2, W * 0.9, W * 0.14, W * 0.08, 0, torsoTop * 0.28, W * 0.80);
+        plate(rig.chest, c2, W * 0.8, W * 0.13, W * 0.08, 0, torsoTop * 0.14, W * 0.56);
         break;
 
       case 'namek':
         sleeves(c1, 1.0);
-        shell(c1, 1.04);
+        shell(c1, 1.10);
         belt(ownMat(f.sash || f.c2), 0.64);
         pants(c1, 1.0);
         boots(ownMat(f.c3), 0.85);
@@ -5108,10 +5139,10 @@ var DBZ = (function () {
       case 'bio':
         /* organic plating: glossy patches over bare skin */
         var pm = c2;
-        shell(out.skinMat, 1.0);
-        var bib = shell(pm, 1.03, torsoTop * 0.16);
+        shell(out.skinMat, 1.02);
+        var bib = shell(pm, 1.09, torsoTop * 0.16);
         bib.scale.y *= 0.52;
-        ellip(rig.torso, pm, W * 0.34, W * 0.30, W * 0.16, 0, -torsoTop * 0.22, W * 0.66);
+        ellip(rig.torso, pm, W * 0.30, W * 0.28, W * 0.14, 0, torsoTop * 0.30, W * 0.48);
         if (f.plates || f.armored) {
           shoulderPads(pm, false);
           [rig.shinL, rig.shinR].forEach(function (s) {
@@ -5129,14 +5160,14 @@ var DBZ = (function () {
           for (var si = 0; si < 6; si++) {
             var sa = (si / 6) * M.PI2;
             ellip(rig.torso, spotM, W * 0.16, W * 0.16, W * 0.05,
-              Math.cos(sa) * W * 0.55, torsoTop * 0.1 + Math.sin(sa) * torsoTop * 0.2, W * 0.62);
+              Math.cos(sa) * W * 0.42, torsoTop * 0.42 + Math.sin(sa) * torsoTop * 0.18, W * 0.46);
           }
         }
         if (f.wings) {
           for (var wi = 0; wi < 2; wi++) {
             var wg = m_(cone(4), ownMat(0x1a1a24), rig.torso);
             wg.scale.set(W * 0.14, W * 1.5, W * 0.5);
-            wg.position.set((wi ? 1 : -1) * W * 0.5, torsoTop * 0.35, -W * 0.66);
+            wg.position.set((wi ? 1 : -1) * W * 0.45, torsoTop * 0.30, -W * 0.48);
             wg.rotation.x = 0.5;
             wg.rotation.z = (wi ? -1 : 1) * 0.5;
           }
@@ -5145,7 +5176,7 @@ var DBZ = (function () {
           for (var sc2 = 0; sc2 < 5; sc2++) {
             var sp2 = m_(cone(4), ownMat(f.c2), rig.torso);
             sp2.scale.set(W * 0.12, W * 0.35, W * 0.12);
-            sp2.position.set(0, torsoTop * (0.42 - sc2 * 0.18), -W * 0.68);
+            sp2.position.set(0, torsoTop * (0.60 - sc2 * 0.18), -W * 0.50);
             sp2.rotation.x = -0.8;
           }
         }
@@ -5154,8 +5185,8 @@ var DBZ = (function () {
 
       case 'jacket':
         pants(ownMat(f.jeans || 0x3a5a8a), 1.0);
-        shell(ownMat(f.c2), 1.0);
-        var jk = shell(c1, 1.06, torsoTop * 0.06);
+        shell(ownMat(f.c2), 1.07);
+        var jk = shell(c1, 1.12, torsoTop * 0.06);
         jk.scale.y *= 0.86;
         if (!f.tee) sleeves(c1, 1.0); else sleeves(c1, 0.55);
         boots(ownMat(f.c3), 0.6);
@@ -5168,9 +5199,9 @@ var DBZ = (function () {
         }
         if (f.scarf) {
           var sf = m_(torus(0.34, 12), ownMat(f.c3), rig.torso);
-          sf.scale.setScalar(W * 0.46);
+          sf.scale.set(W * 0.40, W * 0.40, W * 0.32);
           sf.rotation.x = Math.PI / 2;
-          sf.position.y = torsoTop * 0.62;
+          sf.position.y = torsoTop * 0.96;
         }
         if (f.gloves) wrist(c3);
         if (f.badge) plate(rig.torso, c3, W * 0.24, W * 0.24, W * 0.06, W * 0.42, torsoTop * 0.34, W * 0.72);
@@ -5179,7 +5210,7 @@ var DBZ = (function () {
         break;
 
       case 'robe':
-        shell(c1, 1.04);
+        shell(c1, 1.10);
         sleeves(c1, 1.1);
         var skirt = m_(cone(14), c1, rig.torso);
         skirt.scale.set(W * 1.1, torsoTop * 1.5, W * 0.95);
@@ -5193,7 +5224,7 @@ var DBZ = (function () {
         boots(ownMat(f.c3), 0.5);
         if (f.egypt) {
           shoulderPads(ownMat(f.c2), false);
-          plate(rig.torso, ownMat(f.c3), W * 1.0, W * 0.2, W * 0.1, 0, torsoTop * 0.5, W * 0.7);
+          plate(rig.chest, ownMat(f.c3), W * 0.9, W * 0.18, W * 0.1, 0, torsoTop * 0.38, W * 0.5);
         }
         if (f.staff) buildStaff(rig, out, P);
         break;
@@ -5222,7 +5253,7 @@ var DBZ = (function () {
         break;
 
       case 'demon':
-        shell(c1, 1.02);
+        shell(c1, 1.09);
         sleeves(c1, 0.9);
         pants(c1, 1.0);
         var bp = shell(c2, 1.09, torsoTop * 0.14);
@@ -5231,7 +5262,7 @@ var DBZ = (function () {
         for (var di = 0; di < 2; di++) {
           var spk = m_(cone(5), c2, rig.torso);
           spk.scale.set(W * 0.16, W * 0.55, W * 0.16);
-          spk.position.set((di ? 1 : -1) * W * 0.92, torsoTop * 0.62, 0);
+          spk.position.set((di ? 1 : -1) * P.shoulderX * 1.02, torsoTop * 0.80, 0);
           spk.rotation.z = (di ? -1 : 1) * 0.3;
         }
         boots(c2, 0.8);
@@ -5241,7 +5272,7 @@ var DBZ = (function () {
 
       case 'fusion':
         /* the Metamoran vest: open jacket, no sleeves, wide sash */
-        shell(out.skinMat, 1.0);
+        shell(out.skinMat, 1.02);
         var vest = shell(c1, 1.07, torsoTop * 0.20);
         vest.scale.y *= 0.66;
         shoulderPads(c1, false);
@@ -5257,13 +5288,13 @@ var DBZ = (function () {
 
       case 'tourney':
       default:
-        shell(c1, 1.03);
+        shell(c1, 1.09);
         sleeves(c1, 0.6);
         pants(c1, 1.0);
         belt(ownMat(f.belt || f.c2), 0.66);
         boots(ownMat(f.c3), 0.6);
         if (f.champ) {
-          var cb = plate(rig.torso, ownMat(0xf2d24b), W * 1.5, W * 0.30, W * 0.14, 0, -torsoTop * 0.30, W * 0.62);
+          var cb = plate(rig.torso, ownMat(0xf2d24b), W * 1.2, W * 0.26, W * 0.14, 0, -torsoTop * 0.26, W * 0.42);
           out.glowParts.push(cb);
         }
         break;
@@ -5335,22 +5366,24 @@ var DBZ = (function () {
     var h = spec.h || 1, bulk = spec.bulk || 1;
     var H = 1.78 * h;
     /* kids and small fighters get proportionally bigger heads */
-    var headRatio = M.lerp(0.122, 0.088, M.sat((h - 0.62) / 0.42));
+    var headRatio = M.lerp(0.122, 0.090, M.sat((h - 0.62) / 0.42));
     var P = {
       H: H,
       headR: H * headRatio,
-      hipY: H * 0.485,
+      hipY: H * 0.480,
       chestY: H * 0.775,
       neckY: H * 0.840,
       headY: H * 0.840 + H * headRatio * 0.98,
-      /* broad shoulders, narrow waist — the whole style lives in this ratio */
-      shoulderW: H * 0.128 * bulk * (spec.fem ? 0.90 : 1),
-      armR: H * 0.038 * bulk,
-      legR: H * 0.049 * bulk,
-      upperArm: H * 0.168,
-      foreArm: H * 0.152,
-      thigh: H * 0.230,
-      shin: H * 0.222
+      /* Broad shoulders over a narrow waist is the entire silhouette. At
+         H*0.152 the shoulders come out ~2.4 head-widths across, which is
+         what reads as a Dragon Ball fighter rather than a stick figure. */
+      shoulderW: H * 0.152 * bulk * (spec.fem ? 0.88 : 1),
+      armR: H * 0.042 * bulk,
+      legR: H * 0.052 * bulk,
+      upperArm: H * 0.170,
+      foreArm: H * 0.155,
+      thigh: H * 0.232,
+      shin: H * 0.224
     };
     P.torsoLen = P.chestY - P.hipY;
     out.P = P;
@@ -5375,26 +5408,52 @@ var DBZ = (function () {
 
     var W = P.shoulderW;
     var TL = P.torsoLen;
-    var waist = spec.fem ? 0.50 : 0.56;
+    var waist = spec.fem ? 0.44 : 0.48;
     out.torsoGeo = torsoGeo(
       (bulk.toFixed(2) + '_' + TL.toFixed(3) + '_' + W.toFixed(3) + '_' + waist),
       [
-        [W * 0.66, -TL * 0.06], [W * 0.70, TL * 0.06], [W * waist, TL * 0.28],
-        [W * 0.78, TL * 0.52], [W * 0.97, TL * 0.74], [W * 1.00, TL * 0.88],
-        [W * 0.72, TL * 0.97], [W * 0.32, TL * 1.03], [0.001, TL * 1.04]
+        [W * 0.40, -TL * 0.10], [W * 0.54, TL * 0.02], [W * waist, TL * 0.26],
+        [W * 0.60, TL * 0.46], [W * 0.86, TL * 0.68], [W * 0.96, TL * 0.86],
+        [W * 0.70, TL * 0.97], [W * 0.30, TL * 1.03], [0.001, TL * 1.04]
       ]);
     var body = m_(out.torsoGeo, skinM, torso);
-    body.scale.z = 0.74;
+    body.scale.z = 0.72;
     out.bodyMesh = body;
 
+    /* A chest node above the waist. Punches rotate the hips one way and the
+       shoulders the other; without a second joint the whole body swings as
+       one plank and every strike looks the same. */
+    var chest = new THREE.Object3D();
+    chest.position.y = TL * 0.30;
+    torso.add(chest);
+    rig.chest = chest;
+
+    /* muscle: pectorals and a stack of abdominals, sitting proud of the lathe */
+    var pecY = TL * 0.44, pecR = W * 0.30;
+    for (var pi = 0; pi < 2; pi++) {
+      var pec = ellip(chest, skinM, pecR, pecR * 0.62, pecR * 0.70,
+        (pi ? 1 : -1) * W * 0.32, pecY, W * 0.28);
+      pec.rotation.z = (pi ? -1 : 1) * 0.18;
+    }
+    for (var ai = 0; ai < 3; ai++) {
+      var absR = W * (0.26 - ai * 0.022);
+      ellip(chest, skinM, absR, absR * 0.52, absR * 0.44,
+        -absR * 0.55, pecY - TL * (0.20 + ai * 0.115), W * 0.20);
+      ellip(chest, skinM, absR, absR * 0.52, absR * 0.44,
+        absR * 0.55, pecY - TL * (0.20 + ai * 0.115), W * 0.20);
+    }
+    /* trapezius wedge — fills the neck-to-shoulder line */
+    var trap = ellip(chest, skinM, W * 0.86, W * 0.24, W * 0.42, 0, TL * 0.60, -W * 0.06);
+    out.trap = trap;
+
     /* neck */
-    var neck = tube(torso, skinM, W * 0.30, W * 0.34, TL * 0.14, 8);
-    neck.position.y = TL * 1.02;
+    var neck = tube(chest, skinM, W * 0.26, W * 0.30, TL * 0.16, 8);
+    neck.position.y = TL * 0.70;
 
     /* --- head ---------------------------------------------------------- */
     var headPivot = new THREE.Object3D();
-    headPivot.position.y = TL * 1.10;
-    torso.add(headPivot);
+    headPivot.position.y = TL * 0.78;
+    chest.add(headPivot);
     rig.head = headPivot;
 
     var hr = P.headR;
@@ -5413,30 +5472,47 @@ var DBZ = (function () {
     buildHeadExtras(headInner, spec, hr, out);
     buildHair(headInner, spec.hair, hr, out);
 
-    /* --- arms ---------------------------------------------------------- */
+    /* --- arms ------------------------------------------------------------
+       Mounted OUTSIDE the torso silhouette. The old rig hung them at 0.92W
+       while the clothed torso reached 1.03W, so every arm was buried in the
+       chest and no pose could be seen. The deltoid ball bridges the gap. */
+    P.shoulderX = W * 1.02;
     function arm(side) {
       var sh = new THREE.Object3D();
-      sh.position.set(side * W * 0.92, TL * 0.86, 0);
-      torso.add(sh);
-      /* deltoid */
-      var delt = ball(sh, skinM, W * 0.36, 0, 0, 0);
-      delt.scale.set(W * 0.36, W * 0.32, W * 0.34);
-      var upper = tube(sh, skinM, P.armR * 0.85, P.armR * 1.12, P.upperArm, 8);
+      sh.position.set(side * P.shoulderX, TL * 0.54, 0);
+      chest.add(sh);
+
+      var delt = ellip(sh, skinM, W * 0.33, W * 0.31, W * 0.32, 0, W * 0.04, 0);
+      delt.rotation.z = -side * 0.2;
+
+      var upper = tube(sh, skinM, P.armR * 0.92, P.armR * 1.20, P.upperArm, 8);
       upper.position.y = -P.upperArm * 0.5;
+      /* bicep — bulges on the front of the upper arm */
+      ellip(sh, skinM, P.armR * 1.05, P.armR * 1.45, P.armR * 1.08,
+        0, -P.upperArm * 0.40, P.armR * 0.14);
 
       var el = new THREE.Object3D();
       el.position.y = -P.upperArm;
       sh.add(el);
-      ball(el, skinM, P.armR * 0.95);
-      var fore = tube(el, skinM, P.armR * 0.78, P.armR * 0.95, P.foreArm, 8);
+      ball(el, skinM, P.armR * 1.00);
+      var fore = tube(el, skinM, P.armR * 0.74, P.armR * 1.02, P.foreArm, 8);
       fore.position.y = -P.foreArm * 0.5;
+      ellip(el, skinM, P.armR * 1.02, P.armR * 1.22, P.armR * 1.02,
+        0, -P.foreArm * 0.30, 0);
 
       var hand = new THREE.Object3D();
       hand.position.y = -P.foreArm;
       el.add(hand);
-      var fist = ball(hand, skinM, P.armR * 1.15);
-      fist.scale.set(P.armR * 1.15, P.armR * 1.32, P.armR * 0.98);
-      return { sh: sh, el: el, hand: hand };
+      /* a fist, not a ball: a rounded block of knuckles plus a thumb, so a
+         punch has something recognisable on the end of it */
+      var fist = ellip(hand, skinM, P.armR * 1.12, P.armR * 1.15, P.armR * 1.30,
+        0, -P.armR * 0.55, 0);
+      var knuck = ellip(hand, skinM, P.armR * 1.05, P.armR * 0.42, P.armR * 0.55,
+        0, -P.armR * 1.28, P.armR * 0.30);
+      var thumb = ellip(hand, skinM, P.armR * 0.34, P.armR * 0.55, P.armR * 0.40,
+        -side * P.armR * 0.95, -P.armR * 0.70, P.armR * 0.35);
+      thumb.rotation.z = side * 0.5;
+      return { sh: sh, el: el, hand: hand, fist: fist };
     }
     var aL = arm(-1), aR = arm(1);
     rig.armL = aL.sh; rig.foreL = aL.el; rig.handL = aL.hand;
@@ -5445,22 +5521,32 @@ var DBZ = (function () {
     /* --- legs ---------------------------------------------------------- */
     function leg(side) {
       var hp = new THREE.Object3D();
-      hp.position.set(side * W * 0.42, 0, 0);
+      hp.position.set(side * W * 0.34, -TL * 0.04, 0);
       hips.add(hp);
-      var thigh = tube(hp, skinM, P.legR * 1.05, P.legR * 1.25, P.thigh, 8);
+      var thigh = tube(hp, skinM, P.legR * 0.92, P.legR * 1.30, P.thigh, 8);
       thigh.position.y = -P.thigh * 0.5;
+      /* quad mass high on the thigh */
+      ellip(hp, skinM, P.legR * 1.06, P.legR * 1.45, P.legR * 1.08,
+        0, -P.thigh * 0.32, P.legR * 0.10);
 
       var kn = new THREE.Object3D();
       kn.position.y = -P.thigh;
       hp.add(kn);
-      ball(kn, skinM, P.legR * 1.02);
-      var shin = tube(kn, skinM, P.legR * 0.82, P.legR * 1.0, P.shin, 8);
+      ball(kn, skinM, P.legR * 0.96);
+      var shin = tube(kn, skinM, P.legR * 0.72, P.legR * 0.98, P.shin, 8);
       shin.position.y = -P.shin * 0.5;
+      /* calf, set back so the leg has a profile */
+      ellip(kn, skinM, P.legR * 0.95, P.legR * 1.30, P.legR * 0.95,
+        0, -P.shin * 0.30, -P.legR * 0.20);
 
       var ft = new THREE.Object3D();
       ft.position.y = -P.shin;
       kn.add(ft);
-      var foot = plate(ft, skinM, P.legR * 2.1, P.legR * 0.9, P.legR * 3.4, 0, -P.legR * 0.35, P.legR * 0.9);
+      var foot = plate(ft, skinM, P.legR * 1.9, P.legR * 0.85, P.legR * 3.2,
+        0, -P.legR * 0.38, P.legR * 0.85);
+      /* toe cap rounds off the boot */
+      ellip(ft, skinM, P.legR * 0.95, P.legR * 0.55, P.legR * 0.75,
+        0, -P.legR * 0.38, P.legR * 2.3);
       return { hp: hp, kn: kn, ft: ft, foot: foot };
     }
     var lL = leg(-1), lR = leg(1);
@@ -5507,6 +5593,566 @@ var DBZ = (function () {
     built.maneStrands.length = 0;
     buildHair(built.rig.headInner, hairSpec, built.P.headR, built);
   };
+
+})(DBZ);
+
+</script>
+  <script>
+/* ============================================================================
+   Dragon Ball Z: Saiyan Cephas — poses and animation clips
+
+   Every pose is a bag of joint angles; every clip is a list of poses on a
+   timeline. Attacks are keyframed the way they are drawn: anticipation (pull
+   back), the strike (fast, past the target), then recovery (settle back to
+   guard). Two-pose snaps read as a twitch; three or four keys read as a punch.
+
+   Sign conventions, verified against the rig in js/build.js:
+     arm  X  negative -> swings FORWARD          positive -> back
+     arm  Z  positive -> swings toward +x        (out for R, in for L)
+     fore X  negative -> elbow bends, hand rises (-1.6 is a right angle)
+     leg  X  negative -> knee lifts forward      positive -> leg trails back
+     shin X  positive -> heel toward the hips
+   ==========================================================================*/
+(function (C) {
+  'use strict';
+
+  var M = C.M;
+  var A = {};
+  C.Anim = A;
+
+  var KEYS = ['hipY', 'hipsX', 'hipsY', 'hipsZ',
+    'torsoX', 'torsoY', 'torsoZ',
+    'chestX', 'chestY', 'chestZ',
+    'headX', 'headY', 'headZ',
+    'aLX', 'aLY', 'aLZ', 'fLX', 'hLX',
+    'aRX', 'aRY', 'aRZ', 'fRX', 'hRX',
+    'lLX', 'lLZ', 'sLX', 'ftLX',
+    'lRX', 'lRZ', 'sRX', 'ftRX'];
+  A.KEYS = KEYS;
+
+  function P(o) {
+    var p = {}, i;
+    for (i = 0; i < KEYS.length; i++) p[KEYS[i]] = 0;
+    if (o) for (var k in o) if (p[k] !== undefined) p[k] = o[k];
+    return p;
+  }
+  A.P = P;
+
+  A.blank = function () { return P(); };
+
+  A.copy = function (src, dst) {
+    for (var i = 0; i < KEYS.length; i++) dst[KEYS[i]] = src[KEYS[i]];
+    return dst;
+  };
+
+  A.lerpInto = function (a, b, t, out) {
+    for (var i = 0; i < KEYS.length; i++) {
+      var k = KEYS[i];
+      out[k] = a[k] + (b[k] - a[k]) * t;
+    }
+    return out;
+  };
+
+  /* ============================== the poses ============================= */
+  /* A bladed fighting stance: hips turned, lead hand up, weight back. */
+  var stance = P({
+    hipsY: 0.30, hipY: -0.012,
+    torsoX: 0.06, torsoY: -0.12,
+    chestY: 0.24, chestX: 0.04,
+    headY: -0.20, headX: 0.04,
+    /* lead (left) hand high and forward */
+    aLX: -0.62, aLZ: -0.34, aLY: 0.18, fLX: -1.78,
+    /* rear (right) hand cocked by the cheek */
+    aRX: -0.24, aRZ: 0.40, aRY: -0.16, fRX: -2.16,
+    lLX: -0.30, lLZ: 0.20, sLX: 0.46, ftLX: -0.18,
+    lRX: 0.14, lRZ: -0.24, sRX: 0.34, ftRX: -0.12
+  });
+
+  var POSE = {
+    stance: stance,
+
+    /* relaxed, used on the menu turntable and between rounds */
+    idle: P({
+      hipsY: 0.16, torsoY: -0.06, chestY: 0.14, headY: -0.10,
+      aLX: -0.16, aLZ: -0.26, fLX: -0.42,
+      aRX: -0.16, aRZ: 0.26, fRX: -0.42,
+      lLX: -0.06, lLZ: 0.13, sLX: 0.12,
+      lRX: 0.02, lRZ: -0.15, sRX: 0.14
+    }),
+
+    fly: P({
+      torsoX: 0.46, chestX: 0.10, hipY: 0.02,
+      aLX: 0.95, aLZ: -0.44, fLX: -0.55,
+      aRX: 0.95, aRZ: 0.44, fRX: -0.55,
+      lLX: 0.30, lLZ: 0.10, sLX: -0.26,
+      lRX: 0.26, lRZ: -0.10, sRX: -0.22,
+      headX: -0.42
+    }),
+
+    dash: P({
+      torsoX: 0.92, chestX: 0.18,
+      aLX: 2.35, aLZ: -0.20, fLX: -0.18,
+      aRX: 2.35, aRZ: 0.20, fRX: -0.18,
+      lLX: 0.46, sLX: -0.50, lRX: 0.34, sRX: -0.42,
+      headX: -0.78
+    }),
+
+    /* Ki charge: feet planted wide, fists clenched low at the hips, chest
+       thrown open, head back. The classic power-up brace. */
+    charge: P({
+      torsoX: -0.24, chestX: -0.16, hipY: -0.05,
+      aLX: 0.42, aLZ: -0.86, aLY: 0.20, fLX: -0.72,
+      aRX: 0.42, aRZ: 0.86, aRY: -0.20, fRX: -0.72,
+      lLX: -0.14, lLZ: 0.40, sLX: 0.52, ftLX: -0.22,
+      lRX: -0.14, lRZ: -0.40, sRX: 0.52, ftRX: -0.22,
+      headX: -0.40
+    }),
+
+    guard: P({
+      torsoX: 0.26, chestX: 0.16, hipY: -0.06, hipsY: 0.18,
+      aLX: -1.16, aLY: 0.48, aLZ: -0.30, fLX: -2.30,
+      aRX: -1.16, aRY: -0.48, aRZ: 0.30, fRX: -2.30,
+      lLX: -0.30, lLZ: 0.26, sLX: 0.56, lRX: -0.24, lRZ: -0.26, sRX: 0.52,
+      headX: 0.20
+    }),
+
+    /* beam: hands cupped at the hip, then thrust out together */
+    beamCharge: P({
+      hipsY: 0.66, torsoY: 0.26, chestY: 0.30, hipY: -0.04,
+      aLX: -0.34, aLY: 1.30, aLZ: -0.30, fLX: -1.92, hLX: -0.5,
+      aRX: -0.34, aRY: 1.24, aRZ: 0.26, fRX: -1.92, hRX: -0.5,
+      lLX: -0.34, lLZ: 0.34, sLX: 0.60, ftLX: -0.24,
+      lRX: -0.14, lRZ: -0.34, sRX: 0.44, ftRX: -0.18,
+      headY: -0.62, headX: 0.10
+    }),
+
+    beamFire: P({
+      hipsY: -0.08, torsoY: -0.06, chestY: -0.10, torsoX: 0.14,
+      aLX: -1.62, aLY: 0.26, aLZ: -0.22, fLX: -0.10, hLX: -0.4,
+      aRX: -1.62, aRY: -0.26, aRZ: 0.22, fRX: -0.10, hRX: -0.4,
+      lLX: -0.40, lLZ: 0.26, sLX: 0.58, lRX: 0.22, lRZ: -0.26, sRX: 0.24,
+      headX: -0.06
+    }),
+
+    palmOut: P({
+      hipsY: 0.10, chestY: -0.34, torsoY: -0.14,
+      aRX: -1.60, aRY: -0.14, aRZ: 0.10, fRX: -0.06, hRX: -0.6,
+      aLX: -0.36, aLZ: -0.72, fLX: -1.66,
+      lLX: -0.26, lLZ: 0.24, sLX: 0.44, lRX: -0.10, lRZ: -0.24, sRX: 0.26
+    }),
+
+    throwOver: P({
+      torsoX: 0.20, chestX: 0.18, chestY: -0.30, hipsY: 0.12,
+      aRX: -2.75, aRZ: 0.16, fRX: -0.30,
+      aLX: -0.70, aLZ: -0.66, fLX: -1.30,
+      lLX: -0.22, sLX: 0.38, lRX: -0.06, sRX: 0.22
+    }),
+
+    roar: P({
+      torsoX: -0.44, chestX: -0.22, hipY: 0.10,
+      aLX: 0.58, aLZ: -1.28, fLX: -0.92,
+      aRX: 0.58, aRZ: 1.28, fRX: -0.92,
+      lLX: -0.24, lLZ: 0.42, sLX: 0.64, ftLX: -0.30,
+      lRX: -0.24, lRZ: -0.42, sRX: 0.64, ftRX: -0.30,
+      headX: -0.66
+    }),
+
+    hit: P({
+      torsoX: -0.42, chestX: -0.26, hipsX: 0.22, hipY: -0.05,
+      aLX: 0.50, aLZ: -0.78, fLX: -0.80,
+      aRX: 0.50, aRZ: 0.78, fRX: -0.80,
+      lLX: 0.20, lLZ: 0.24, sLX: 0.58, lRX: 0.08, lRZ: -0.22, sRX: 0.44,
+      headX: -0.48
+    }),
+
+    blow: P({
+      torsoX: -0.78, chestX: -0.34, hipsX: 0.42,
+      aLX: 1.85, aLZ: -0.95, fLX: -0.35,
+      aRX: 1.85, aRZ: 0.95, fRX: -0.35,
+      lLX: 0.62, lLZ: 0.22, sLX: 0.35, lRX: 0.42, lRZ: -0.20, sRX: 0.25,
+      headX: -0.85
+    }),
+
+    down: P({
+      hipY: -0.70, hipsX: -1.40, torsoX: 0.14, chestX: 0.10,
+      aLX: 0.60, aLZ: -1.36, aRX: 0.60, aRZ: 1.36,
+      lLX: 0.22, lLZ: 0.22, sLX: 0.35, lRX: 0.16, lRZ: -0.22, sRX: 0.28,
+      headX: 0.32
+    }),
+
+    victory: P({
+      torsoX: -0.08, hipY: 0.12, chestY: 0.10,
+      aRX: -2.70, aRZ: 0.34, fRX: -0.30,
+      aLX: -0.30, aLZ: -0.48, fLX: -1.60,
+      lLX: -0.08, lLZ: 0.14, sLX: 0.16, lRX: -0.08, lRZ: -0.14, sRX: 0.16,
+      headX: -0.24
+    }),
+
+    intro: P({
+      hipsY: 0.10, aLZ: -0.20, aRZ: 0.20, fLX: -0.30, fRX: -0.30,
+      lLZ: 0.10, lRZ: -0.12
+    })
+  };
+  A.POSE = POSE;
+
+  /* ============================== the clips =============================
+     `keys` are {t, p} with t in 0..1 of the clip's own duration. `hit` is
+     when the damage frame lands, so timing and animation can never drift.  */
+  function clip(o) {
+    o.keys.sort(function (a, b) { return a.t - b.t; });
+    return o;
+  }
+
+  /* helper: a pose expressed as "stance, but with these joints changed" */
+  function from(base, o) {
+    var p = P();
+    A.copy(base, p);
+    for (var k in o) if (p[k] !== undefined) p[k] = o[k];
+    return p;
+  }
+  A.from = from;
+
+  var CLIP = {};
+  A.CLIP = CLIP;
+
+  /* ---- straight left (jab) ------------------------------------------- */
+  CLIP.jab = clip({
+    dur: 0.30, hit: 0.30, side: -1,
+    keys: [
+      { t: 0.00, p: stance },
+      /* anticipation: shoulder loads back, weight sinks */
+      {
+        t: 0.16, p: from(stance, {
+          chestY: 0.46, hipsY: 0.38, aLX: -0.34, fLX: -2.10, hipY: -0.035
+        })
+      },
+      /* strike: arm snaps straight, chest whips through */
+      {
+        t: 0.34, p: from(stance, {
+          chestY: -0.42, hipsY: 0.06, torsoY: -0.22,
+          aLX: -1.66, aLY: 0.10, aLZ: -0.12, fLX: -0.04,
+          aRX: -0.10, aRZ: 0.52, fRX: -2.30,
+          lLX: -0.42, sLX: 0.30, lRX: 0.26, sRX: 0.40, hipY: -0.02
+        })
+      },
+      /* over-extension, then snap back to guard */
+      {
+        t: 0.52, p: from(stance, {
+          chestY: -0.30, aLX: -1.54, fLX: -0.30, aRZ: 0.46, fRX: -2.22
+        })
+      },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  /* ---- right cross ----------------------------------------------------- */
+  CLIP.cross = clip({
+    dur: 0.34, hit: 0.34, side: 1,
+    keys: [
+      { t: 0.00, p: stance },
+      {
+        t: 0.18, p: from(stance, {
+          chestY: 0.52, hipsY: 0.46, aRX: 0.10, fRX: -2.35, hipY: -0.04
+        })
+      },
+      {
+        t: 0.36, p: from(stance, {
+          chestY: -0.62, hipsY: -0.16, torsoY: -0.32, torsoX: 0.10,
+          aRX: -1.70, aRY: -0.12, aRZ: 0.10, fRX: -0.02,
+          aLX: -0.20, aLZ: -0.50, fLX: -2.30,
+          lRX: -0.30, sRX: 0.26, lLX: -0.10, sLX: 0.42, hipY: -0.015
+        })
+      },
+      {
+        t: 0.55, p: from(stance, {
+          chestY: -0.44, aRX: -1.56, fRX: -0.28, aLZ: -0.44, fLX: -2.20
+        })
+      },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  /* ---- left hook ------------------------------------------------------- */
+  CLIP.hook = clip({
+    dur: 0.34, hit: 0.36, side: -1,
+    keys: [
+      { t: 0.00, p: stance },
+      {
+        t: 0.18, p: from(stance, {
+          chestY: 0.54, hipsY: 0.44, aLX: -0.52, aLZ: -0.86, aLY: 0.55, fLX: -1.70
+        })
+      },
+      {
+        t: 0.38, p: from(stance, {
+          chestY: -0.58, hipsY: -0.10, torsoY: -0.26,
+          aLX: -1.10, aLY: -0.62, aLZ: -0.30, fLX: -1.34,
+          aRX: -0.14, aRZ: 0.50, fRX: -2.28,
+          lLX: -0.36, sLX: 0.34, lRX: 0.20, sRX: 0.42
+        })
+      },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  /* ---- rising uppercut -------------------------------------------------- */
+  CLIP.upper = clip({
+    dur: 0.36, hit: 0.38, side: 1,
+    keys: [
+      { t: 0.00, p: stance },
+      {
+        t: 0.20, p: from(stance, {
+          hipY: -0.07, torsoX: 0.24, chestX: 0.18, chestY: 0.42,
+          aRX: 0.44, aRZ: 0.30, fRX: -2.30, lLX: -0.42, sLX: 0.70, lRX: 0.10, sRX: 0.56
+        })
+      },
+      {
+        t: 0.40, p: from(stance, {
+          hipY: 0.06, torsoX: -0.30, chestX: -0.26, chestY: -0.30,
+          aRX: -0.92, aRY: -0.20, aRZ: 0.22, fRX: -1.66,
+          aLX: -0.20, aLZ: -0.54, fLX: -2.24,
+          lLX: -0.16, sLX: 0.22, lRX: -0.04, sRX: 0.16, headX: -0.24
+        })
+      },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  /* ---- right roundhouse kick -------------------------------------------- */
+  CLIP.kickRound = clip({
+    dur: 0.40, hit: 0.40, side: 1, leg: 1,
+    keys: [
+      { t: 0.00, p: stance },
+      /* chamber: knee comes up and across */
+      {
+        t: 0.20, p: from(stance, {
+          hipsY: 0.52, chestY: 0.34, torsoX: -0.10, hipY: -0.02,
+          lRX: -1.30, lRZ: -0.55, sRX: 1.30, ftRX: -0.30,
+          lLX: -0.06, lLZ: 0.16, sLX: 0.26,
+          aLX: -0.40, aLZ: -0.80, fLX: -1.50, aRX: -0.10, aRZ: 0.70, fRX: -1.80
+        })
+      },
+      /* extension: hip snaps over, leg whips straight */
+      {
+        t: 0.42, p: from(stance, {
+          hipsY: -0.44, chestY: -0.66, torsoZ: 0.22, torsoX: -0.18, hipY: 0.04,
+          lRX: -1.52, lRZ: -0.95, sRX: 0.18, ftRX: -0.36,
+          lLX: 0.10, lLZ: 0.12, sLX: 0.22,
+          aLX: -0.30, aLZ: -1.00, fLX: -1.10, aRX: 0.55, aRZ: 0.95, fRX: -0.90,
+          headY: -0.30
+        })
+      },
+      /* retract the knee before setting the foot down */
+      {
+        t: 0.66, p: from(stance, {
+          hipsY: -0.10, chestY: -0.20, lRX: -0.90, lRZ: -0.50, sRX: 1.10
+        })
+      },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  /* ---- spinning back kick ----------------------------------------------- */
+  CLIP.kickSpin = clip({
+    dur: 0.46, hit: 0.44, side: -1, leg: 1,
+    keys: [
+      { t: 0.00, p: stance },
+      {
+        t: 0.18, p: from(stance, {
+          hipsY: 0.85, chestY: 0.70, headY: 0.55, hipY: -0.04,
+          lRX: 0.30, sRX: 0.50, lLX: -0.20, sLX: 0.50
+        })
+      },
+      {
+        t: 0.44, p: from(stance, {
+          hipsY: -1.05, chestY: -0.85, headY: -0.55, torsoX: -0.26, hipY: 0.05,
+          lRX: -1.42, lRZ: -0.30, sRX: 0.12, ftRX: -0.34,
+          lLX: 0.18, lLZ: 0.10, sLX: 0.20,
+          aLX: 0.30, aLZ: -1.20, fLX: -0.70, aRX: 0.30, aRZ: 1.20, fRX: -0.70
+        })
+      },
+      {
+        t: 0.70, p: from(stance, {
+          hipsY: -0.30, chestY: -0.20, lRX: -0.60, sRX: 0.80
+        })
+      },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  /* ---- two-fist overhead hammer (the launcher) --------------------------- */
+  CLIP.smash = clip({
+    dur: 0.52, hit: 0.46, side: 1,
+    keys: [
+      { t: 0.00, p: stance },
+      /* big anticipation — both fists overhead, back arched */
+      {
+        t: 0.26, p: from(stance, {
+          hipY: 0.09, torsoX: -0.42, chestX: -0.30, hipsY: 0.10,
+          aLX: -2.85, aLZ: -0.30, fLX: -0.34,
+          aRX: -2.85, aRZ: 0.30, fRX: -0.34,
+          lLX: -0.20, sLX: 0.30, lRX: -0.10, sRX: 0.26, headX: -0.36
+        })
+      },
+      /* the drop */
+      {
+        t: 0.48, p: from(stance, {
+          hipY: -0.10, torsoX: 0.66, chestX: 0.38,
+          aLX: -0.55, aLZ: -0.22, fLX: -0.22,
+          aRX: -0.55, aRZ: 0.22, fRX: -0.22,
+          lLX: -0.34, sLX: 0.62, lRX: -0.24, sRX: 0.56, headX: 0.40
+        })
+      },
+      { t: 0.68, p: from(stance, { torsoX: 0.40, chestX: 0.22, hipY: -0.05 }) },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  /* ---- flying knee / rush strike used by cinematic rushes ---------------- */
+  CLIP.rushHit = clip({
+    dur: 0.22, hit: 0.30, side: 1,
+    keys: [
+      { t: 0.00, p: from(stance, { chestY: 0.50, aRX: 0.20, fRX: -2.30 }) },
+      {
+        t: 0.30, p: from(stance, {
+          chestY: -0.60, torsoY: -0.28, aRX: -1.72, aRZ: 0.08, fRX: -0.02,
+          aLX: -0.16, aLZ: -0.52, fLX: -2.30, lRX: -0.34, sRX: 0.30
+        })
+      },
+      { t: 1.00, p: from(stance, { chestY: -0.20, aRX: -1.30, fRX: -0.60 }) }
+    ]
+  });
+
+  /* ---- ki blast: quick single-palm shove --------------------------------- */
+  CLIP.kiShot = clip({
+    dur: 0.26, hit: 0.34, side: 1,
+    keys: [
+      { t: 0.00, p: stance },
+      { t: 0.20, p: from(stance, { chestY: 0.34, aRX: 0.10, aRZ: 0.46, fRX: -2.10 }) },
+      {
+        t: 0.40, p: from(POSE.palmOut, { chestY: -0.30 })
+      },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  /* ---- beam: draw back, gather, thrust ----------------------------------- */
+  CLIP.beam = clip({
+    dur: 1.0, hit: 0.72, side: 1, hold: true,
+    keys: [
+      { t: 0.00, p: stance },
+      { t: 0.22, p: from(POSE.beamCharge, { hipsY: 0.48, headY: -0.42 }) },
+      /* the gather — hands drop lower, body coils tighter */
+      { t: 0.62, p: from(POSE.beamCharge, { hipY: -0.075, torsoX: 0.10 }) },
+      { t: 0.72, p: POSE.beamFire },
+      { t: 1.00, p: POSE.beamFire }
+    ]
+  });
+
+  /* ---- overhead sphere throw --------------------------------------------- */
+  CLIP.sphere = clip({
+    dur: 0.62, hit: 0.55, side: 1,
+    keys: [
+      { t: 0.00, p: stance },
+      {
+        t: 0.30, p: from(POSE.throwOver, {
+          torsoX: -0.34, chestX: -0.24, aRX: -2.90, hipY: 0.06
+        })
+      },
+      { t: 0.55, p: from(POSE.throwOver, { torsoX: 0.34, chestX: 0.22, aRX: -1.30, chestY: -0.42 }) },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  /* ---- nova: crouch then erupt -------------------------------------------- */
+  CLIP.nova = clip({
+    dur: 0.60, hit: 0.42, side: 1,
+    keys: [
+      { t: 0.00, p: stance },
+      {
+        t: 0.26, p: from(POSE.charge, {
+          hipY: -0.11, torsoX: 0.34, chestX: 0.24, headX: 0.30,
+          aLZ: -0.50, aRZ: 0.50, fLX: -1.90, fRX: -1.90
+        })
+      },
+      { t: 0.42, p: from(POSE.roar, { hipY: 0.10 }) },
+      { t: 0.66, p: from(POSE.roar, { hipY: 0.02 }) },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  /* ---- getting hit --------------------------------------------------------- */
+  CLIP.hitLight = clip({
+    dur: 0.26, hit: 0,
+    keys: [
+      { t: 0.00, p: from(stance, { torsoX: -0.30, chestX: -0.22, headX: -0.34 }) },
+      { t: 0.30, p: POSE.hit },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  CLIP.hitHeavy = clip({
+    dur: 0.5, hit: 0,
+    keys: [
+      { t: 0.00, p: POSE.hit },
+      { t: 0.25, p: from(POSE.blow, { torsoX: -0.9 }) },
+      { t: 1.00, p: POSE.blow }
+    ]
+  });
+
+  /* ---- power up ------------------------------------------------------------ */
+  CLIP.transform = clip({
+    dur: 0.95, hit: 0,
+    keys: [
+      { t: 0.00, p: stance },
+      { t: 0.14, p: from(POSE.charge, { hipY: -0.09, torsoX: 0.22, headX: 0.24 }) },
+      { t: 0.34, p: from(POSE.roar, { hipY: 0.12, headX: -0.72 }) },
+      { t: 0.72, p: from(POSE.roar, { hipY: 0.04 }) },
+      { t: 1.00, p: stance }
+    ]
+  });
+
+  CLIP.victory = clip({
+    dur: 1.3, hit: 0,
+    keys: [
+      { t: 0.00, p: stance },
+      { t: 0.22, p: from(POSE.victory, { aRX: -1.2, hipY: 0.04 }) },
+      { t: 0.45, p: POSE.victory },
+      { t: 1.00, p: POSE.victory }
+    ]
+  });
+
+  /* ============================== sampling =============================== */
+  /* Cubic ease on each segment so limbs accelerate and settle rather than
+     sliding linearly, which is most of what makes a strike feel like one. */
+  function ease(t) { return t * t * (3 - 2 * t); }
+
+  A.sample = function (cl, t, out) {
+    var keys = cl.keys;
+    t = M.sat(t);
+    if (t <= keys[0].t) return A.copy(keys[0].p, out);
+    var last = keys[keys.length - 1];
+    if (t >= last.t) return A.copy(last.p, out);
+    for (var i = 0; i < keys.length - 1; i++) {
+      var a = keys[i], b = keys[i + 1];
+      if (t >= a.t && t <= b.t) {
+        var u = (t - a.t) / Math.max(1e-5, b.t - a.t);
+        return A.lerpInto(a.p, b.p, ease(u), out);
+      }
+    }
+    return A.copy(last.p, out);
+  };
+
+  /* Which clip plays for a given combo step or special archetype. */
+  A.comboClip = ['jab', 'cross', 'kickRound', 'hook', 'kickSpin', 'smash'];
+
+  A.archClip = {
+    beam: 'beam', sphere: 'sphere', barrage: 'kiShot', disc: 'sphere',
+    nova: 'nova', swarm: 'nova', rush: 'rushHit', buff: 'transform',
+    trick: 'nova'
+  };
+
+  /* Back-compat: the rest of the game still reaches for C.POSE. */
+  C.POSE = POSE;
 
 })(DBZ);
 
@@ -5587,164 +6233,12 @@ var DBZ = (function () {
     return mesh;
   }
 
-  /* ============================ pose plumbing =========================== */
-  var PKEYS = ['hipY', 'hipsX', 'hipsY', 'hipsZ', 'torsoX', 'torsoY', 'torsoZ',
-    'headX', 'headY', 'headZ',
-    'aLX', 'aLY', 'aLZ', 'fLX', 'aRX', 'aRY', 'aRZ', 'fRX',
-    'lLX', 'lLZ', 'sLX', 'lRX', 'lRZ', 'sRX', 'ftLX', 'ftRX'];
-
-  function P(o) {
-    var p = {};
-    for (var i = 0; i < PKEYS.length; i++) p[PKEYS[i]] = 0;
-    if (o) for (var k in o) if (p[k] !== undefined || k === 'hipY') p[k] = o[k];
-    return p;
-  }
-
-  /* The fighting stance every other pose is measured against. */
-  var POSE = {
-    stance: P({
-      torsoX: 0.07, torsoY: 0.16, hipsY: -0.10,
-      aLX: -0.34, aLZ: -0.17, fLX: -0.92,
-      aRX: -0.46, aRZ: 0.20, fRX: -1.10,
-      lLX: -0.16, lLZ: 0.19, sLX: 0.30, ftLX: -0.14,
-      lRX: -0.10, lRZ: -0.21, sRX: 0.24, ftRX: -0.10,
-      headY: -0.10
-    }),
-    fly: P({
-      torsoX: 0.50, hipY: 0.02,
-      aLX: 1.20, aLZ: 0.28, fLX: -0.35,
-      aRX: 1.20, aRZ: -0.28, fRX: -0.35,
-      lLX: 0.28, lLZ: 0.08, sLX: -0.30,
-      lRX: 0.28, lRZ: -0.08, sRX: -0.30,
-      headX: -0.45
-    }),
-    dash: P({
-      torsoX: 0.95,
-      aLX: 2.45, aLZ: 0.16, fLX: -0.20,
-      aRX: 2.45, aRZ: -0.16, fRX: -0.20,
-      lLX: 0.45, sLX: -0.55, lRX: 0.35, sRX: -0.45,
-      headX: -0.75
-    }),
-    charge: P({
-      torsoX: -0.22, hipsY: 0,
-      aLX: 0.55, aLZ: 0.85, fLX: -0.55,
-      aRX: 0.55, aRZ: -0.85, fRX: -0.55,
-      lLX: -0.22, lLZ: 0.30, sLX: 0.46, ftLX: -0.20,
-      lRX: -0.22, lRZ: -0.30, sRX: 0.46, ftRX: -0.20,
-      headX: -0.35
-    }),
-    guard: P({
-      torsoX: 0.24, hipsY: -0.05,
-      aLX: -1.30, aLY: 0.55, aLZ: 0.55, fLX: -1.85,
-      aRX: -1.30, aRY: -0.55, aRZ: -0.55, fRX: -1.85,
-      lLX: -0.28, lLZ: 0.22, sLX: 0.52, lRX: -0.28, lRZ: -0.22, sRX: 0.52,
-      headX: 0.18
-    }),
-    punchR: P({
-      torsoY: -0.52, torsoX: 0.14,
-      aRX: -1.62, aRY: -0.10, aRZ: -0.06, fRX: -0.10,
-      aLX: -0.20, aLZ: 0.95, fLX: -2.20,
-      lLX: -0.18, lLZ: 0.18, sLX: 0.34, lRX: -0.05, lRZ: -0.16, sRX: 0.20
-    }),
-    punchL: P({
-      torsoY: 0.52, torsoX: 0.14,
-      aLX: -1.62, aLY: 0.10, aLZ: 0.06, fLX: -0.10,
-      aRX: -0.20, aRZ: -0.95, fRX: -2.20,
-      lRX: -0.18, lRZ: -0.18, sRX: 0.34, lLX: -0.05, lLZ: 0.16, sLX: 0.20
-    }),
-    kickR: P({
-      torsoX: -0.30, torsoY: -0.30, hipsX: -0.20,
-      lRX: -1.45, lRZ: -0.22, sRX: 0.16, ftRX: -0.30,
-      lLX: 0.10, lLZ: 0.10, sLX: 0.16,
-      aLX: -0.60, aLZ: 1.10, fLX: -1.30, aRX: 0.70, aRZ: -0.85, fRX: -0.90
-    }),
-    kickSpin: P({
-      torsoX: -0.10, torsoY: 0.55, hipsX: -0.32,
-      lRX: -1.30, lRZ: -0.65, sRX: 0.10,
-      lLX: 0.24, lLZ: 0.16, sLX: 0.50,
-      aLX: -0.30, aLZ: 1.40, aRX: -0.30, aRZ: -1.40
-    }),
-    smash: P({
-      torsoX: 0.55, hipsX: 0.20,
-      aLX: -2.65, aLZ: 0.22, fLX: -0.28,
-      aRX: -2.65, aRZ: -0.22, fRX: -0.28,
-      lLX: -0.15, sLX: 0.35, lRX: -0.15, sRX: 0.35,
-      headX: 0.30
-    }),
-    windup: P({
-      torsoX: -0.42, torsoY: 0.62,
-      aRX: 0.95, aRY: -0.30, aRZ: -0.55, fRX: -1.95,
-      aLX: -0.65, aLZ: 0.75, fLX: -1.15,
-      lLX: -0.24, lLZ: 0.24, sLX: 0.48, lRX: -0.20, lRZ: -0.24, sRX: 0.40
-    }),
-    beamCharge: P({
-      torsoY: 0.62, torsoX: 0.05, hipsY: 0.30,
-      aLX: -0.55, aLY: 1.25, aLZ: 0.55, fLX: -1.55,
-      aRX: -0.55, aRY: 1.25, aRZ: -0.10, fRX: -1.55,
-      lLX: -0.28, lLZ: 0.30, sLX: 0.55, ftLX: -0.24,
-      lRX: -0.24, lRZ: -0.30, sRX: 0.50, ftRX: -0.20,
-      headY: -0.55
-    }),
-    beamFire: P({
-      torsoY: -0.10, torsoX: 0.16, hipsY: -0.05,
-      aLX: -1.58, aLY: 0.30, aLZ: 0.26, fLX: -0.16,
-      aRX: -1.58, aRY: -0.30, aRZ: -0.26, fRX: -0.16,
-      lLX: -0.30, lLZ: 0.24, sLX: 0.52, lRX: -0.10, lRZ: -0.24, sRX: 0.28,
-      headX: -0.08
-    }),
-    throwOver: P({
-      torsoX: 0.35, torsoY: -0.25,
-      aRX: -2.85, aRZ: -0.14, fRX: -0.20,
-      aLX: -0.80, aLZ: 0.90, fLX: -1.20,
-      lLX: -0.18, sLX: 0.32, lRX: -0.10, sRX: 0.24
-    }),
-    palmOut: P({
-      torsoY: -0.28, torsoX: 0.10,
-      aRX: -1.58, aRY: -0.16, aRZ: -0.10, fRX: -0.05,
-      aLX: -0.45, aLZ: 0.85, fLX: -1.40,
-      lLX: -0.22, lLZ: 0.20, sLX: 0.40, lRX: -0.12, lRZ: -0.20, sRX: 0.28
-    }),
-    roar: P({
-      torsoX: -0.42, hipsY: 0.12,
-      aLX: 0.70, aLZ: 1.35, fLX: -0.85,
-      aRX: 0.70, aRZ: -1.35, fRX: -0.85,
-      lLX: -0.30, lLZ: 0.38, sLX: 0.62, ftLX: -0.28,
-      lRX: -0.30, lRZ: -0.38, sRX: 0.62, ftRX: -0.28,
-      headX: -0.62
-    }),
-    hit: P({
-      torsoX: -0.55, hipsX: 0.28, hipsY: 0.18, hipY: -0.06,
-      aLX: 0.60, aLZ: 0.95, fLX: -0.75,
-      aRX: 0.60, aRZ: -0.95, fRX: -0.75,
-      lLX: 0.24, lLZ: 0.26, sLX: 0.62, lRX: 0.10, lRZ: -0.24, sRX: 0.48,
-      headX: -0.55
-    }),
-    blow: P({
-      torsoX: -0.85, hipsX: 0.45,
-      aLX: 1.85, aLZ: 1.05, fLX: -0.35,
-      aRX: 1.85, aRZ: -1.05, fRX: -0.35,
-      lLX: 0.62, lLZ: 0.22, sLX: 0.35, lRX: 0.42, lRZ: -0.20, sRX: 0.25,
-      headX: -0.85
-    }),
-    down: P({
-      hipY: -0.72, hipsX: -1.42, torsoX: 0.16,
-      aLX: 0.65, aLZ: 1.42, aRX: 0.65, aRZ: -1.42,
-      lLX: 0.22, lLZ: 0.22, sLX: 0.35, lRX: 0.16, lRZ: -0.22, sRX: 0.28,
-      headX: 0.35
-    }),
-    victory: P({
-      torsoX: -0.10, hipsY: 0.14,
-      aRX: -2.75, aRZ: -0.32, fRX: -0.30,
-      aLX: -0.35, aLZ: 0.55, fLX: -1.65,
-      lLX: -0.10, lLZ: 0.14, sLX: 0.18, lRX: -0.10, lRZ: -0.14, sRX: 0.18,
-      headX: -0.22
-    }),
-    intro: P({
-      torsoX: 0.02, aLZ: 0.16, aRZ: -0.16, fLX: -0.25, fRX: -0.25,
-      lLZ: 0.08, lRZ: -0.08
-    })
-  };
-  C.POSE = POSE;
+  /* ============================ pose plumbing ===========================
+     Poses and clips live in js/anim.js; this file just plays them back. */
+  var A = C.Anim;
+  var PKEYS = A.KEYS;
+  var P = A.P;
+  var POSE = A.POSE;
 
   /* ============================== Fighter =============================== */
   function Fighter(spec, opts) {
@@ -5876,6 +6370,43 @@ var DBZ = (function () {
     this.poseBlend = blend === undefined ? 20 : blend;
   };
 
+  /* ------------------------------------------------------------ clips ----
+     Play a keyframed animation from js/anim.js. `dur` overrides the clip's
+     own length so a move's timing and its animation always agree.        */
+  Fighter.prototype.playClip = function (name, dur, opts) {
+    var cl = A.CLIP[name];
+    if (!cl) return false;
+    this.clip = {
+      def: cl, name: name, t: 0,
+      dur: dur || cl.dur,
+      hold: !!(opts && opts.hold) || !!cl.hold,
+      mirror: !!(opts && opts.mirror)
+    };
+    if (!this._clipPose) this._clipPose = P();
+    return true;
+  };
+
+  Fighter.prototype.stopClip = function () { this.clip = null; };
+
+  Fighter.prototype.clipDone = function () {
+    return !this.clip || this.clip.t >= 1;
+  };
+
+  Fighter.prototype.updateClip = function (dt) {
+    var c = this.clip;
+    if (!c) return false;
+    c.t += dt / Math.max(0.02, c.dur);
+    if (c.t >= 1 && !c.hold) { this.clip = null; return false; }
+    A.sample(c.def, Math.min(1, c.t), this._clipPose);
+    /* a clip drives the target directly and snaps hard — the keyframes
+       already carry the easing, so a slow blend would only smear them */
+    for (var i = 0; i < PKEYS.length; i++) {
+      this.poseTarget[PKEYS[i]] = this._clipPose[PKEYS[i]];
+    }
+    this.poseBlend = 40;
+    return true;
+  };
+
   Fighter.prototype.applyPose = function (dt) {
     var p = this.pose, t = this.poseTarget, r = this.rig;
     var k = 1 - Math.exp(-this.poseBlend * dt);
@@ -5884,20 +6415,28 @@ var DBZ = (function () {
       p[key] += (t[key] - p[key]) * k;
     }
 
-    /* idle life: breathing, weight shift, hair and cloth sway */
+    /* Idle life, layered on top of whatever pose is playing. A fighter that
+       holds perfectly still reads as a statue no matter how good the pose. */
     var bt = this.animT;
-    var breathe = this.state === 'ko' ? 0 : Math.sin(bt * 2.4) * 0.02;
+    var alive = this.alive && this.state !== 'ko';
+    var breathe = alive ? Math.sin(bt * 2.3) * 0.022 : 0;
+    var sway2 = alive ? Math.sin(bt * 1.15) * 0.030 : 0;   /* slow weight shift */
+    var bounce = alive ? Math.sin(bt * 2.3 + 1.2) * 0.006 : 0;
     var bob = 0;
-    if (this.state === 'fly' || this.state === 'idle' && !this.grounded) bob = Math.sin(bt * 1.8) * 0.05;
+    if (!this.grounded || this.flying) bob = Math.sin(bt * 1.7) * 0.05;
 
-    r.hips.position.y = this.P.hipY + p.hipY * this.height + breathe * 0.4 + bob;
-    r.hips.rotation.set(p.hipsX, p.hipsY, p.hipsZ);
-    r.torso.rotation.set(p.torsoX + breathe, p.torsoY, p.torsoZ);
-    r.head.rotation.set(p.headX - breathe * 0.5, p.headY, p.headZ);
-    r.armL.rotation.set(p.aLX, p.aLY, p.aLZ);
-    r.armR.rotation.set(p.aRX, p.aRY, p.aRZ);
+    r.hips.position.y = this.P.hipY + p.hipY * this.height + bounce + bob;
+    r.hips.rotation.set(p.hipsX, p.hipsY + sway2 * 0.5, p.hipsZ + sway2 * 0.35);
+    r.torso.rotation.set(p.torsoX + breathe, p.torsoY, p.torsoZ - sway2 * 0.25);
+    if (r.chest) r.chest.rotation.set(p.chestX + breathe * 0.8, p.chestY, p.chestZ);
+    /* the head counter-rotates a little so it stays levelled at the target */
+    r.head.rotation.set(p.headX - breathe * 0.6, p.headY - sway2 * 0.4, p.headZ);
+    r.armL.rotation.set(p.aLX + breathe * 0.5, p.aLY, p.aLZ - breathe * 0.6);
+    r.armR.rotation.set(p.aRX + breathe * 0.5, p.aRY, p.aRZ + breathe * 0.6);
     r.foreL.rotation.x = p.fLX;
     r.foreR.rotation.x = p.fRX;
+    if (r.handL) r.handL.rotation.x = p.hLX;
+    if (r.handR) r.handR.rotation.x = p.hRX;
     r.legL.rotation.set(p.lLX, 0, p.lLZ);
     r.legR.rotation.set(p.lRX, 0, p.lRZ);
     r.shinL.rotation.x = p.sLX;
@@ -5967,7 +6506,7 @@ var DBZ = (function () {
     this.aura.material.uniforms.uCore.value.set(1, 1, 1);
     this.auraCore.material.uniforms.uColor.value.copy(c).multiplyScalar(1.4);
     this.auraCore.material.uniforms.uCore.value.set(1.4, 1.4, 1.4);
-    this.baseGlow = f ? (f.glow || 0.6) : 0.16;
+    this.baseGlow = f ? (f.glow || 0.6) : 0.10;
   };
 
   Fighter.prototype.form = function () {
@@ -6012,6 +6551,7 @@ var DBZ = (function () {
        animation; taking a full combo on top of that just teaches players to
        never press the most exciting button in the game. */
     this.invuln = Math.max(this.invuln, 1.0);
+    this.playClip('transform', 0.95);
     this.kiDrain = f.kiDrain;
     C.bus.emit('transform', { fighter: this, form: f });
     return true;
@@ -6196,9 +6736,12 @@ var DBZ = (function () {
         this.setState('blow');
         this.stunT = info.stun || 0.85;
         this.grounded = false;
+        this.playClip('hitHeavy', Math.max(0.4, this.stunT), { hold: true });
       } else {
         this.setState('hit');
         this.stunT = info.stun || 0.28;
+        /* a short recoil clip, so being hit is a motion and not a held pose */
+        this.playClip('hitLight', Math.max(0.22, this.stunT * 1.1));
       }
       this.act = null;
       this.chargeT = 0;
@@ -6273,16 +6816,19 @@ var DBZ = (function () {
       this.guard = Math.min(100, this.guard + (this.state === 'guard' ? 3 : 16) * dt);
     }
 
-    /* --- state timers --- */
+    /* --- state timers ---
+       A running clip owns the pose; these states only set one when there is
+       no clip, so an attack animation is never stomped mid-swing. */
+    var clipRunning = this.updateClip(dt);
     switch (this.state) {
       case 'hit':
         this.stunT -= dt;
-        this.setPose(POSE.hit, 22);
+        if (!clipRunning) this.setPose(POSE.hit, 22);
         if (this.stunT <= 0) this.setState('idle');
         break;
       case 'blow':
         this.stunT -= dt;
-        this.setPose(POSE.blow, 9);
+        if (!clipRunning) this.setPose(POSE.blow, 9);
         if (this.stunT <= 0) {
           if (this.grounded) { this.setState('down'); this.downT = 0.55; }
           else this.setState('idle');
@@ -6290,6 +6836,7 @@ var DBZ = (function () {
         break;
       case 'down':
         this.downT -= dt;
+        this.stopClip();
         this.setPose(POSE.down, 12);
         if (this.downT <= 0) { this.setState('rise'); }
         break;
@@ -6298,11 +6845,12 @@ var DBZ = (function () {
         if (this.stateT > 0.32) { this.setState('idle'); this.invuln = 0.25; }
         break;
       case 'ko':
+        this.stopClip();
         this.setPose(POSE.down, 6);
         break;
       case 'transform':
-        this.setPose(POSE.roar, 10);
-        if (this.stateT > 0.9) this.setState('idle');
+        if (!clipRunning) this.setPose(POSE.roar, 10);
+        if (this.stateT > 0.95) this.setState('idle');
         break;
       case 'vanish':
         if (this.stateT > 0.14) { this.setState('idle'); }
@@ -6310,10 +6858,23 @@ var DBZ = (function () {
       case 'charge':
         this.chargeT += dt;
         this.ki = Math.min(this.maxKi, this.ki + this.kiCharge * dt);
+        this.stopClip();
+        /* the strain shake — a charging fighter should vibrate, not pose */
+        var q = 1 + Math.min(1.6, this.chargeT * 0.8);
         this.setPose(POSE.charge, 14);
+        this.poseTarget.torsoX += Math.sin(this.animT * 34) * 0.020 * q;
+        this.poseTarget.chestX += Math.sin(this.animT * 41 + 1) * 0.022 * q;
+        this.poseTarget.headX += Math.sin(this.animT * 37 + 2) * 0.030 * q;
+        this.poseTarget.aLZ += Math.sin(this.animT * 44) * 0.030 * q;
+        this.poseTarget.aRZ -= Math.sin(this.animT * 44) * 0.030 * q;
+        this.poseTarget.hipY += Math.abs(Math.sin(this.animT * 22)) * 0.008 * q;
         break;
       case 'guard':
+        this.stopClip();
         this.setPose(POSE.guard, 18);
+        /* absorb-the-blow micro-recoil while blocking */
+        var gr = Math.max(0, 0.25 - (this.animT - this.lastHitTime)) * 4;
+        if (gr > 0) { this.poseTarget.torsoX -= gr * 0.18; this.poseTarget.hipY -= gr * 0.02; }
         break;
     }
 
@@ -6418,8 +6979,15 @@ var DBZ = (function () {
     if (this.transformFlash > 0) want = Math.max(want, this.transformFlash * 2.6);
 
     this.auraLevel = M.damp(this.auraLevel === undefined ? 0 : this.auraLevel, want, 9, dt);
-    u.uIntensity.value = this.auraLevel * 0.65;
-    u2.uIntensity.value = this.auraLevel * 0.55;
+    /* Non-linear so a resting fighter's aura all but disappears. A linear
+       ramp left a faintly lit cone around everyone at all times, which read
+       as a glass lampshade rather than as ki. */
+    var lv = Math.pow(Math.max(0, this.auraLevel), 1.7);
+    var show = this.auraLevel > 0.20;
+    this.aura.visible = show;
+    this.auraCore.visible = show;
+    u.uIntensity.value = lv * 0.70;
+    u2.uIntensity.value = lv * 0.58;
     var s = 1 + this.auraLevel * 0.10;
     this.aura.scale.set(s, 1 + this.auraLevel * 0.20, s);
 
@@ -6444,37 +7012,81 @@ var DBZ = (function () {
     }
   };
 
-  /* run / fly cycle layered on top of whatever pose is active */
+  /* Locomotion and the standing idle. Layered over the stance, never
+     replacing it, so a fighter always looks ready rather than parked. */
   Fighter.prototype.animateLocomotion = function (dt) {
+    if (this.clip) return;                       /* a clip owns the pose */
     if (this.busy() || this.state === 'charge' || this.state === 'guard') return;
-    var sp = Math.hypot(this.vel.x, this.vel.z);
     if (!this.alive) return;
+    var sp = Math.hypot(this.vel.x, this.vel.z);
+    var p = this.poseTarget, i;
+    var bt = this.animT;
+
+    function base(src) {
+      for (i = 0; i < PKEYS.length; i++) p[PKEYS[i]] = src[PKEYS[i]];
+    }
 
     if (!this.grounded || this.flying) {
-      if (sp > this.flySpd * 0.55) this.setPose(POSE.dash, 10);
-      else if (sp > 0.6 || !this.grounded) this.setPose(POSE.fly, 8);
-      else this.setPose(POSE.stance, 10);
+      if (sp > this.flySpd * 0.55) { this.setPose(POSE.dash, 10); return; }
+      if (sp > 0.6 || !this.grounded) {
+        /* hovering: legs trail and drift, arms float — not a frozen T-pose */
+        base(POSE.fly);
+        var f2 = Math.sin(bt * 1.9), g2 = Math.cos(bt * 1.5);
+        p.lLX += f2 * 0.10; p.lRX -= f2 * 0.09;
+        p.sLX += g2 * 0.08; p.sRX -= g2 * 0.07;
+        p.aLZ -= f2 * 0.07; p.aRZ += f2 * 0.07;
+        p.torsoX += g2 * 0.05;
+        this.poseBlend = 9;
+        return;
+      }
+      this.setPose(POSE.stance, 10);
       return;
     }
 
-    if (sp < 0.45) { this.setPose(POSE.stance, 10); return; }
+    if (sp < 0.45) {
+      /* Standing idle: a boxer's bounce. Small, fast, and constant — this is
+         the difference between a fighting game and a diorama. */
+      base(POSE.stance);
+      var b = Math.sin(bt * 3.4);
+      var b2 = Math.sin(bt * 3.4 + 0.9);
+      p.hipY += (Math.abs(b) - 0.5) * 0.016;
+      p.sLX += Math.abs(b) * 0.10;
+      p.sRX += Math.abs(b2) * 0.09;
+      p.lLX -= Math.abs(b) * 0.05;
+      p.lRX -= Math.abs(b2) * 0.04;
+      /* fists breathe in and out of guard */
+      p.fLX += b * 0.075;
+      p.fRX -= b2 * 0.065;
+      p.aLX += b * 0.045;
+      p.aRX -= b2 * 0.040;
+      p.chestY += b * 0.035;
+      p.hipsY -= b * 0.028;
+      this.poseBlend = 13;
+      return;
+    }
 
-    /* grounded run: a stance with swinging limbs */
-    var cyc = this.animT * M.clamp(sp * 1.5, 5, 16);
+    /* Grounded run: contralateral swing with a real knee lift and a bob. */
+    var cyc = bt * M.clamp(sp * 1.6, 6, 17);
     var s = Math.sin(cyc), c = Math.cos(cyc);
-    var amp = M.clamp(sp / this.moveSpd, 0.3, 1.2);
-    var p = this.poseTarget;
-    for (var i = 0; i < PKEYS.length; i++) p[PKEYS[i]] = POSE.stance[PKEYS[i]];
-    p.lLX += s * 0.85 * amp;
-    p.lRX += -s * 0.85 * amp;
-    p.sLX += Math.max(0, -s) * 1.1 * amp;
-    p.sRX += Math.max(0, s) * 1.1 * amp;
-    p.aLX += -s * 0.55 * amp;
-    p.aRX += s * 0.55 * amp;
-    p.torsoX += 0.16 * amp;
-    p.hipY = Math.abs(c) * 0.012 * amp;
-    p.hipsY += s * 0.12 * amp;
-    this.poseBlend = 18;
+    var amp = M.clamp(sp / this.moveSpd, 0.35, 1.25);
+    base(POSE.stance);
+    p.lLX += s * 0.95 * amp;
+    p.lRX += -s * 0.95 * amp;
+    /* the trailing leg folds; the leading one straightens to plant */
+    p.sLX += Math.max(0, -s) * 1.30 * amp;
+    p.sRX += Math.max(0, s) * 1.30 * amp;
+    p.ftLX += -Math.max(0, -s) * 0.30 * amp;
+    p.ftRX += -Math.max(0, s) * 0.30 * amp;
+    p.aLX += -s * 0.60 * amp;
+    p.aRX += s * 0.60 * amp;
+    p.fLX += -Math.abs(s) * 0.25 * amp;
+    p.fRX += -Math.abs(s) * 0.25 * amp;
+    p.torsoX += 0.15 * amp;
+    p.hipY += (Math.abs(c) - 0.5) * 0.030 * amp;
+    p.hipsY += s * 0.16 * amp;
+    p.chestY += -s * 0.20 * amp;         /* shoulders counter the hips */
+    p.headY += s * 0.05 * amp;
+    this.poseBlend = 20;
   };
 
   /* ------------------------------------------------------------- movement */
@@ -6542,6 +7154,7 @@ var DBZ = (function () {
       this.snapFace();
     }
     this.vel.multiplyScalar(0.1);
+    this.stopClip();
     this.setState('vanish');
     this.invuln = 0.28;
     this.stunT = 0;
@@ -6571,6 +7184,7 @@ var DBZ = (function () {
     this.shield = 0;
     this.blind = this.bound = this.slowT = this.markT = this.dizzy = 0;
     while (this.formIdx >= 0) this.revert();
+    this.stopClip();
     this.setPose(POSE.stance, 999);
     this.syncTransform();
   };
@@ -6622,13 +7236,16 @@ var DBZ = (function () {
 
   /* ============================ melee attacks =========================== */
   /* Combo strings. Each entry: pose, timings, damage scale, knockback.     */
+  /* Each step names an animation clip and the fraction of it at which the
+     damage lands, so the hit frame and the visible strike can never drift.
+     `cancel` is when the next attack may be buffered in. */
   var COMBO = [
-    { pose: 'punchR', wind: 0.055, hit: 0.055, rec: 0.10, dmg: 1.00, kb: 3, side: 1 },
-    { pose: 'punchL', wind: 0.050, hit: 0.055, rec: 0.10, dmg: 1.05, kb: 3, side: -1 },
-    { pose: 'kickR', wind: 0.065, hit: 0.060, rec: 0.13, dmg: 1.25, kb: 5, side: 1 },
-    { pose: 'punchR', wind: 0.055, hit: 0.055, rec: 0.10, dmg: 1.15, kb: 4, side: 1 },
-    { pose: 'kickSpin', wind: 0.075, hit: 0.065, rec: 0.15, dmg: 1.45, kb: 7, side: -1 },
-    { pose: 'smash', wind: 0.11, hit: 0.070, rec: 0.24, dmg: 2.20, kb: 22, launch: 1, big: 1, side: 1 }
+    { clip: 'jab', dur: 0.30, hit: 0.34, cancel: 0.56, dmg: 1.00, kb: 3, side: -1 },
+    { clip: 'cross', dur: 0.34, hit: 0.36, cancel: 0.58, dmg: 1.08, kb: 3, side: 1 },
+    { clip: 'kickRound', dur: 0.40, hit: 0.42, cancel: 0.68, dmg: 1.30, kb: 5, side: 1 },
+    { clip: 'hook', dur: 0.34, hit: 0.38, cancel: 0.60, dmg: 1.16, kb: 4, side: -1 },
+    { clip: 'kickSpin', dur: 0.46, hit: 0.44, cancel: 0.72, dmg: 1.50, kb: 7, side: 1 },
+    { clip: 'smash', dur: 0.52, hit: 0.46, cancel: 0.80, dmg: 2.20, kb: 22, launch: 1, big: 1, side: 1 }
   ];
 
   var RUSH_RANGE = 19;      /* auto-close distance for a locked-on strike */
@@ -6637,7 +7254,8 @@ var DBZ = (function () {
   Mv.melee = function (f, world, heavy) {
     if (!f.canAct()) {
       /* allow buffering the next hit while recovering */
-      if (f.act && f.act.type === 'melee' && f.act.phase === 'rec' && f.act.step < 5) f.act.buffer = true;
+      if (f.act && f.act.type === 'melee' && f.act.step < 5 &&
+          f.act.t / f.act.c.dur >= f.act.c.cancel * 0.6) f.act.buffer = true;
       return false;
     }
     /* the five-hit string loops so a held button never stalls on one move */
@@ -6650,10 +7268,10 @@ var DBZ = (function () {
     var c = COMBO[step];
     f.setState('melee');
     f.act = {
-      type: 'melee', step: step, c: c, t: 0, phase: 'wind', done: false,
-      heavy: !!heavy, buffer: false, rushed: false
+      type: 'melee', step: step, c: c, t: 0, done: false,
+      heavy: !!heavy, buffer: false, rushed: false, didHit: false
     };
-    f.setPose(POSE.windup, 26);
+    f.playClip(c.clip, c.dur);
 
     /* close the gap — this is what makes the game feel like the anime */
     var t = f.target;
@@ -6679,25 +7297,27 @@ var DBZ = (function () {
   function meleeTick(f, dt, world) {
     var a = f.act, c = a.c;
     a.t += dt;
-    if (a.phase === 'wind') {
-      f.setPoseMix(POSE.windup, POSE[c.pose], M.sat(a.t / c.wind), 30);
-      if (a.t >= c.wind) { a.phase = 'hit'; a.t = 0; f.setPose(POSE[c.pose], 34); doMeleeHit(f, c, world); }
-    } else if (a.phase === 'hit') {
-      if (a.t >= c.hit) { a.phase = 'rec'; a.t = 0; }
-    } else {
-      if (a.t >= c.rec * (a.buffer ? 0.35 : 1)) {
-        var next = a.step + 1;
-        /* A queued special / ultimate / transformation outranks the combo —
-           otherwise a held attack button chains forever and the buffered
-           action never finds a frame where the fighter can act. */
-        var chain = (a.buffer || (f.autoCombo && f.holdAttack)) && !f.buf;
-        if (chain && next <= 4 && !a.heavy) {
-          startMelee(f, world, next, false);
-        } else {
-          f.act = null;
-          f.setState('idle');
-        }
-      }
+    var frac = a.t / c.dur;
+
+    if (!a.didHit && frac >= c.hit) {
+      a.didHit = true;
+      doMeleeHit(f, c, world);
+    }
+
+    if (frac < c.cancel) return;
+
+    var next = a.step + 1;
+    /* A queued special / ultimate / transformation outranks the combo —
+       otherwise a held attack button chains forever and the buffered
+       action never finds a frame where the fighter can act. */
+    var chain = (a.buffer || (f.autoCombo && f.holdAttack)) && !f.buf;
+    if (chain && next <= 4 && !a.heavy) {
+      startMelee(f, world, next, false);
+      return;
+    }
+    if (frac >= 1) {
+      f.act = null;
+      f.setState('idle');
     }
   }
 
@@ -7152,14 +7772,16 @@ var DBZ = (function () {
     f.faceLock = 0;
     f.snapFace();
     var arch = def.arch;
-    if (arch === 'beam') f.setPose(POSE.beamCharge, 16);
-    else if (arch === 'sphere') f.setPose(POSE.throwOver, 14);
-    else if (arch === 'barrage') f.setPose(POSE.palmOut, 20);
-    else if (arch === 'disc') f.setPose(POSE.throwOver, 18);
-    else if (arch === 'nova') f.setPose(POSE.roar, 14);
-    else if (arch === 'swarm') f.setPose(POSE.roar, 14);
-    else if (arch === 'rush') f.setPose(POSE.windup, 22);
-    else if (arch === 'buff' || arch === 'trick') f.setPose(POSE.roar, 14);
+    /* One clip covers the whole move — wind-up, release and recovery — so the
+       body flows through it instead of snapping between two held poses. */
+    var T = TIMING[arch] || TIMING.nova;
+    var wind = T[0] * (isUlt ? 1.5 : 1);
+    if (arch === 'beam') wind = (def.charge || 1) * (isUlt ? 0.85 : 0.62);
+    var total = wind + T[1] * (isUlt ? 1.35 : 1) + T[2];
+    var clipName = C.Anim.archClip[arch] || 'nova';
+    f.act.clipTotal = total;
+    f.act.windFrac = wind / total;
+    f.playClip(clipName, total, { hold: arch === 'beam' });
     C.bus.emit('special', { fighter: f, def: def, ult: !!isUlt });
     return true;
   };
@@ -7251,7 +7873,6 @@ var DBZ = (function () {
       case 'beam': {
         var lh = f.handPos(-1, _v), rh = f.handPos(1, _v2);
         origin.set((lh.x + rh.x) * 0.5, (lh.y + rh.y) * 0.5, (lh.z + rh.z) * 0.5);
-        f.setPose(POSE.beamFire, 30);
         var dur = ult ? 1.5 : 0.95;
         Mv.spawnBeam({
           owner: f, origin: origin, dir: dir,
@@ -7266,7 +7887,6 @@ var DBZ = (function () {
         break;
       }
       case 'sphere': {
-        f.setPose(POSE.throwOver, 26);
         var sp = def.sky ? 26 : 34;
         var from = def.sky ? _v.set(f.pos.x, f.pos.y + f.height * 1.6, f.pos.z) : origin;
         Mv.spawnProj({
@@ -7278,7 +7898,6 @@ var DBZ = (function () {
         break;
       }
       case 'disc': {
-        f.setPose(POSE.throwOver, 26);
         var n = def.count || 1;
         for (var i = 0; i < n; i++) {
           var d2 = dir.clone();
@@ -7293,7 +7912,6 @@ var DBZ = (function () {
         break;
       }
       case 'nova': {
-        f.setPose(POSE.roar, 22);
         var r = (def.radius || 9) * (ult ? 1.4 : 1);
         var c = f.chest(_v);
         explode(c, def.color, r, (def.dmg || 800) * mul * 0.9, f, null, world);
@@ -7307,7 +7925,6 @@ var DBZ = (function () {
       case 'barrage': {
         a.shots = def.count || 12;
         a.shotT = 0;
-        f.setPose(POSE.palmOut, 26);
         break;
       }
       case 'swarm': {
@@ -7413,7 +8030,7 @@ var DBZ = (function () {
     f.vel.set(0, 0, 0);
     f.flying = true; f.grounded = false;
     FX.ghost(f.model, f.auraColor, 0.22, 0.6);
-    f.setPose(a.done % 2 ? POSE.punchR : POSE.punchL, 40);
+    f.playClip('rushHit', 0.9 / Math.max(1, a.hits) * 1.6);
 
     var last = a.done >= a.hits;
     var base = (def.dmg ? def.dmg / a.hits : (a.ult ? 260 : 150));
@@ -7625,7 +8242,7 @@ var DBZ = (function () {
     if (f.ki < 2) return false;
     f.ki -= 2;
     f.kiShotT = 0.13;
-    if (f.canAct()) { f.setPose(POSE.palmOut, 30); f.faceLock = 0.18; }
+    if (f.canAct()) { f.playClip('kiShot', 0.26); f.faceLock = 0.18; }
     var side = (f.kiSide = -(f.kiSide || -1));
     var origin = f.handPos(side, new THREE.Vector3());
     var dir = f.aim(new THREE.Vector3());

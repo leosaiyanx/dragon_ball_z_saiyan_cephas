@@ -189,9 +189,9 @@
             /* sweep everything backward into one blade */
             a = -Math.PI / 2 + (i / Math.max(1, count - 1) - 0.5) * 1.5;
           }
-          var len = h.len * hr * (h.style === 'flame' ? (6.2 - r * 1.0) : (4.5 - r * 0.6)) *
-            (0.82 + 0.36 * M.hash1(i * 3.1 + r * 7.7));
-          var rad = hr * (h.style === 'flame' ? 0.30 : 0.27) * thick * (1 - r * 0.10);
+          var len = h.len * hr * (h.style === 'flame' ? (7.6 - r * 1.2) : (5.9 - r * 0.75)) *
+            (0.84 + 0.34 * M.hash1(i * 3.1 + r * 7.7));
+          var rad = hr * (h.style === 'flame' ? 0.34 : 0.31) * thick * (1 - r * 0.09);
           spike = spikeAt(a, phi, len, lift * (1 + r * 0.15), rad, (tip && r === 0) ? tm : hm);
           if (h.style === 'flame') spike.rotation.z += 0.0;
         }
@@ -549,27 +549,34 @@
 
     function sleeves(material, len) {
       [rig.armL, rig.armR].forEach(function (a) {
-        var sl = tube(a, material, P.armR * 1.30, P.armR * 1.42, P.upperArm * len, 8);
+        var sl = tube(a, material, P.armR * 1.42, P.armR * 1.56, P.upperArm * len, 8);
         sl.position.y = -P.upperArm * len * 0.5;
         out.clothParts.push(sl);
       });
     }
 
+    /* Trousers cover the thigh AND the top of the shin, so the boot has
+       something to tuck into instead of leaving a band of bare knee. */
     function pants(material, len) {
       [rig.legL, rig.legR].forEach(function (l) {
-        var pl = tube(l, material, P.legR * 1.18, P.legR * 1.32, P.thigh * len, 8);
+        var pl = tube(l, material, P.legR * 1.30, P.legR * 1.48, P.thigh * len, 8);
         pl.position.y = -P.thigh * len * 0.5;
+      });
+      [rig.shinL, rig.shinR].forEach(function (sn) {
+        var cuff = tube(sn, material, P.legR * 1.44, P.legR * 1.30, P.shin * 0.62, 8);
+        cuff.position.y = -P.shin * 0.28;
       });
     }
 
     function boots(material, high, bandMat) {
       var hi = high || 0.8;
       [rig.shinL, rig.shinR].forEach(function (s) {
-        var bt = tube(s, material, P.legR * 1.12, P.legR * 1.24, P.shin * hi, 8);
-        bt.position.y = -P.shin * hi * 0.5;
+        var bt = tube(s, material, P.legR * 1.36, P.legR * 1.28, P.shin * hi, 8);
+        bt.position.y = -P.shin + P.shin * hi * 0.5;
         if (bandMat) {
-          var band = tube(s, bandMat, P.legR * 1.18, P.legR * 1.18, P.shin * 0.14, 8);
-          band.position.y = -P.shin * hi + P.shin * 0.07;
+          /* the cuff sits at the TOP of the boot, at mid-calf */
+          var band = tube(s, bandMat, P.legR * 1.42, P.legR * 1.42, P.shin * 0.12, 8);
+          band.position.y = -P.shin + P.shin * hi - P.shin * 0.02;
         }
       });
       [rig.footL, rig.footR].forEach(function (ft) {
@@ -577,19 +584,42 @@
       });
     }
 
+    /* A sash rides the narrowest point of the waist, not the hip bone. Made
+       wide on purpose: it is the break between gi top and gi trousers, and
+       without it the whole fighter reads as one orange tube. */
     function belt(material, r) {
-      var b = m_(torus(0.30, 14), material, rig.torso);
-      b.scale.set(W * (r || 0.60), W * (r || 0.60), W * (r || 0.60) * 0.74);
+      var rr = W * (r || 0.60);
+      var b = m_(torus(0.46, 18), material, rig.torso);
+      b.scale.set(rr, rr, rr * 0.76);
       b.rotation.x = Math.PI / 2;
-      b.position.y = -torsoTop * 0.30;
+      b.position.y = torsoTop * 0.22;
+      /* the knot, tied off to one side */
+      var knot = ellip(rig.torso, material, rr * 0.34, rr * 0.30, rr * 0.26,
+        rr * 0.42, torsoTop * 0.20, rr * 0.62);
+      knot.rotation.z = 0.4;
+      return b;
     }
 
+    /* the coloured undershirt showing at the collar and down the front */
+    function collar(material) {
+      var c = ellip(rig.chest, material, W * 0.40, W * 0.16, W * 0.34,
+        0, torsoTop * 0.58, W * 0.16);
+      var v = m_(cone(6), material, rig.chest);
+      v.scale.set(W * 0.30, W * 0.42, W * 0.22);
+      v.position.set(0, torsoTop * 0.40, W * 0.34);
+      v.rotation.x = Math.PI;
+      return c;
+    }
+
+    /* Pads sit on the chest node at the real shoulder height. They used to be
+       pinned to the torso at 0.44 of its length — the middle of the ribcage. */
     function shoulderPads(material, big) {
-      [[-1, rig.torso], [1, rig.torso]].forEach(function (s) {
-        var pad = m_(sph(10), material, s[1]);
+      [-1, 1].forEach(function (side) {
+        var pad = m_(sph(10), material, rig.chest);
         var k = big ? 1.0 : 0.78;
-        pad.scale.set(W * 0.44 * k, W * 0.34 * k, W * 0.40 * k);
-        pad.position.set(s[0] * W * 0.92, torsoTop * 0.44, 0);
+        pad.scale.set(W * 0.46 * k, W * 0.36 * k, W * 0.42 * k);
+        pad.position.set(side * P.shoulderX * 0.96, torsoTop * 0.56, 0);
+        pad.rotation.z = -side * 0.22;
       });
     }
 
@@ -622,18 +652,19 @@
     switch (kind) {
       case 'gi':
         if (!f.sleeveless) sleeves(c1, 0.98); else sleeves(c1, 0.28);
-        shell(c1, 1.03);
+        shell(c1, 1.09);
         if (f.shirt) shell(ownMat(f.shirt), 0.99, -torsoTop * 0.08);
-        belt(ownMat(f.belt || f.c2), 0.62);
+        collar(ownMat(f.c2));
+        belt(ownMat(f.belt || f.c2), 0.60);
         pants(c1, 1.0);
-        boots(ownMat(f.boots || f.c2), 0.74, ownMat(f.c3));
+        boots(ownMat(f.boots || f.c2), 0.52, ownMat(f.c3));
         wrist(ownMat(f.c3));
         if (f.kanji) {
-          var k1 = plate(rig.torso, ownMat(f.c2), W * 0.42, W * 0.42, W * 0.06, W * 0.42, torsoTop * 0.30, W * 0.74);
+          var k1 = plate(rig.chest, ownMat(f.c2), W * 0.38, W * 0.38, W * 0.06, W * 0.34, torsoTop * 0.16, W * 0.52);
           k1.rotation.y = -0.2;
         }
         if (f.pride) {
-          plate(rig.torso, c2, W * 1.5, W * 0.16, W * 0.1, 0, torsoTop * 0.30, W * 0.76);
+          plate(rig.chest, c2, W * 1.3, W * 0.14, W * 0.1, 0, torsoTop * 0.14, W * 0.55);
         }
         break;
 
@@ -642,11 +673,11 @@
         var suit = ownMat(f.suit || 0x2b3a6b);
         sleeves(suit, 1.0);
         pants(suit, 1.0);
-        shell(suit, 1.0);
+        shell(suit, 1.07);
         var plateM = c1;
-        var chest = shell(plateM, 1.10, torsoTop * 0.12);
+        var chest = shell(plateM, 1.16, torsoTop * 0.12);
         chest.scale.y *= 0.72;
-        var abs = shell(ownMat(f.c3), 1.02, -torsoTop * 0.16);
+        var abs = shell(ownMat(f.c3), 1.08, -torsoTop * 0.16);
         abs.scale.y *= 0.55;
         if (f.shoulders) shoulderPads(plateM, true);
         if (f.skirt) {
@@ -657,12 +688,12 @@
         }
         boots(plateM, 0.85);
         wrist(plateM);
-        plate(rig.torso, c2, W * 0.9, W * 0.14, W * 0.08, 0, torsoTop * 0.28, W * 0.80);
+        plate(rig.chest, c2, W * 0.8, W * 0.13, W * 0.08, 0, torsoTop * 0.14, W * 0.56);
         break;
 
       case 'namek':
         sleeves(c1, 1.0);
-        shell(c1, 1.04);
+        shell(c1, 1.10);
         belt(ownMat(f.sash || f.c2), 0.64);
         pants(c1, 1.0);
         boots(ownMat(f.c3), 0.85);
@@ -681,10 +712,10 @@
       case 'bio':
         /* organic plating: glossy patches over bare skin */
         var pm = c2;
-        shell(out.skinMat, 1.0);
-        var bib = shell(pm, 1.03, torsoTop * 0.16);
+        shell(out.skinMat, 1.02);
+        var bib = shell(pm, 1.09, torsoTop * 0.16);
         bib.scale.y *= 0.52;
-        ellip(rig.torso, pm, W * 0.34, W * 0.30, W * 0.16, 0, -torsoTop * 0.22, W * 0.66);
+        ellip(rig.torso, pm, W * 0.30, W * 0.28, W * 0.14, 0, torsoTop * 0.30, W * 0.48);
         if (f.plates || f.armored) {
           shoulderPads(pm, false);
           [rig.shinL, rig.shinR].forEach(function (s) {
@@ -702,14 +733,14 @@
           for (var si = 0; si < 6; si++) {
             var sa = (si / 6) * M.PI2;
             ellip(rig.torso, spotM, W * 0.16, W * 0.16, W * 0.05,
-              Math.cos(sa) * W * 0.55, torsoTop * 0.1 + Math.sin(sa) * torsoTop * 0.2, W * 0.62);
+              Math.cos(sa) * W * 0.42, torsoTop * 0.42 + Math.sin(sa) * torsoTop * 0.18, W * 0.46);
           }
         }
         if (f.wings) {
           for (var wi = 0; wi < 2; wi++) {
             var wg = m_(cone(4), ownMat(0x1a1a24), rig.torso);
             wg.scale.set(W * 0.14, W * 1.5, W * 0.5);
-            wg.position.set((wi ? 1 : -1) * W * 0.5, torsoTop * 0.35, -W * 0.66);
+            wg.position.set((wi ? 1 : -1) * W * 0.45, torsoTop * 0.30, -W * 0.48);
             wg.rotation.x = 0.5;
             wg.rotation.z = (wi ? -1 : 1) * 0.5;
           }
@@ -718,7 +749,7 @@
           for (var sc2 = 0; sc2 < 5; sc2++) {
             var sp2 = m_(cone(4), ownMat(f.c2), rig.torso);
             sp2.scale.set(W * 0.12, W * 0.35, W * 0.12);
-            sp2.position.set(0, torsoTop * (0.42 - sc2 * 0.18), -W * 0.68);
+            sp2.position.set(0, torsoTop * (0.60 - sc2 * 0.18), -W * 0.50);
             sp2.rotation.x = -0.8;
           }
         }
@@ -727,8 +758,8 @@
 
       case 'jacket':
         pants(ownMat(f.jeans || 0x3a5a8a), 1.0);
-        shell(ownMat(f.c2), 1.0);
-        var jk = shell(c1, 1.06, torsoTop * 0.06);
+        shell(ownMat(f.c2), 1.07);
+        var jk = shell(c1, 1.12, torsoTop * 0.06);
         jk.scale.y *= 0.86;
         if (!f.tee) sleeves(c1, 1.0); else sleeves(c1, 0.55);
         boots(ownMat(f.c3), 0.6);
@@ -741,9 +772,9 @@
         }
         if (f.scarf) {
           var sf = m_(torus(0.34, 12), ownMat(f.c3), rig.torso);
-          sf.scale.setScalar(W * 0.46);
+          sf.scale.set(W * 0.40, W * 0.40, W * 0.32);
           sf.rotation.x = Math.PI / 2;
-          sf.position.y = torsoTop * 0.62;
+          sf.position.y = torsoTop * 0.96;
         }
         if (f.gloves) wrist(c3);
         if (f.badge) plate(rig.torso, c3, W * 0.24, W * 0.24, W * 0.06, W * 0.42, torsoTop * 0.34, W * 0.72);
@@ -752,7 +783,7 @@
         break;
 
       case 'robe':
-        shell(c1, 1.04);
+        shell(c1, 1.10);
         sleeves(c1, 1.1);
         var skirt = m_(cone(14), c1, rig.torso);
         skirt.scale.set(W * 1.1, torsoTop * 1.5, W * 0.95);
@@ -766,7 +797,7 @@
         boots(ownMat(f.c3), 0.5);
         if (f.egypt) {
           shoulderPads(ownMat(f.c2), false);
-          plate(rig.torso, ownMat(f.c3), W * 1.0, W * 0.2, W * 0.1, 0, torsoTop * 0.5, W * 0.7);
+          plate(rig.chest, ownMat(f.c3), W * 0.9, W * 0.18, W * 0.1, 0, torsoTop * 0.38, W * 0.5);
         }
         if (f.staff) buildStaff(rig, out, P);
         break;
@@ -795,7 +826,7 @@
         break;
 
       case 'demon':
-        shell(c1, 1.02);
+        shell(c1, 1.09);
         sleeves(c1, 0.9);
         pants(c1, 1.0);
         var bp = shell(c2, 1.09, torsoTop * 0.14);
@@ -804,7 +835,7 @@
         for (var di = 0; di < 2; di++) {
           var spk = m_(cone(5), c2, rig.torso);
           spk.scale.set(W * 0.16, W * 0.55, W * 0.16);
-          spk.position.set((di ? 1 : -1) * W * 0.92, torsoTop * 0.62, 0);
+          spk.position.set((di ? 1 : -1) * P.shoulderX * 1.02, torsoTop * 0.80, 0);
           spk.rotation.z = (di ? -1 : 1) * 0.3;
         }
         boots(c2, 0.8);
@@ -814,7 +845,7 @@
 
       case 'fusion':
         /* the Metamoran vest: open jacket, no sleeves, wide sash */
-        shell(out.skinMat, 1.0);
+        shell(out.skinMat, 1.02);
         var vest = shell(c1, 1.07, torsoTop * 0.20);
         vest.scale.y *= 0.66;
         shoulderPads(c1, false);
@@ -830,13 +861,13 @@
 
       case 'tourney':
       default:
-        shell(c1, 1.03);
+        shell(c1, 1.09);
         sleeves(c1, 0.6);
         pants(c1, 1.0);
         belt(ownMat(f.belt || f.c2), 0.66);
         boots(ownMat(f.c3), 0.6);
         if (f.champ) {
-          var cb = plate(rig.torso, ownMat(0xf2d24b), W * 1.5, W * 0.30, W * 0.14, 0, -torsoTop * 0.30, W * 0.62);
+          var cb = plate(rig.torso, ownMat(0xf2d24b), W * 1.2, W * 0.26, W * 0.14, 0, -torsoTop * 0.26, W * 0.42);
           out.glowParts.push(cb);
         }
         break;
@@ -908,22 +939,24 @@
     var h = spec.h || 1, bulk = spec.bulk || 1;
     var H = 1.78 * h;
     /* kids and small fighters get proportionally bigger heads */
-    var headRatio = M.lerp(0.122, 0.088, M.sat((h - 0.62) / 0.42));
+    var headRatio = M.lerp(0.122, 0.090, M.sat((h - 0.62) / 0.42));
     var P = {
       H: H,
       headR: H * headRatio,
-      hipY: H * 0.485,
+      hipY: H * 0.480,
       chestY: H * 0.775,
       neckY: H * 0.840,
       headY: H * 0.840 + H * headRatio * 0.98,
-      /* broad shoulders, narrow waist — the whole style lives in this ratio */
-      shoulderW: H * 0.128 * bulk * (spec.fem ? 0.90 : 1),
-      armR: H * 0.038 * bulk,
-      legR: H * 0.049 * bulk,
-      upperArm: H * 0.168,
-      foreArm: H * 0.152,
-      thigh: H * 0.230,
-      shin: H * 0.222
+      /* Broad shoulders over a narrow waist is the entire silhouette. At
+         H*0.152 the shoulders come out ~2.4 head-widths across, which is
+         what reads as a Dragon Ball fighter rather than a stick figure. */
+      shoulderW: H * 0.152 * bulk * (spec.fem ? 0.88 : 1),
+      armR: H * 0.042 * bulk,
+      legR: H * 0.052 * bulk,
+      upperArm: H * 0.170,
+      foreArm: H * 0.155,
+      thigh: H * 0.232,
+      shin: H * 0.224
     };
     P.torsoLen = P.chestY - P.hipY;
     out.P = P;
@@ -948,26 +981,52 @@
 
     var W = P.shoulderW;
     var TL = P.torsoLen;
-    var waist = spec.fem ? 0.50 : 0.56;
+    var waist = spec.fem ? 0.44 : 0.48;
     out.torsoGeo = torsoGeo(
       (bulk.toFixed(2) + '_' + TL.toFixed(3) + '_' + W.toFixed(3) + '_' + waist),
       [
-        [W * 0.66, -TL * 0.06], [W * 0.70, TL * 0.06], [W * waist, TL * 0.28],
-        [W * 0.78, TL * 0.52], [W * 0.97, TL * 0.74], [W * 1.00, TL * 0.88],
-        [W * 0.72, TL * 0.97], [W * 0.32, TL * 1.03], [0.001, TL * 1.04]
+        [W * 0.40, -TL * 0.10], [W * 0.54, TL * 0.02], [W * waist, TL * 0.26],
+        [W * 0.60, TL * 0.46], [W * 0.86, TL * 0.68], [W * 0.96, TL * 0.86],
+        [W * 0.70, TL * 0.97], [W * 0.30, TL * 1.03], [0.001, TL * 1.04]
       ]);
     var body = m_(out.torsoGeo, skinM, torso);
-    body.scale.z = 0.74;
+    body.scale.z = 0.72;
     out.bodyMesh = body;
 
+    /* A chest node above the waist. Punches rotate the hips one way and the
+       shoulders the other; without a second joint the whole body swings as
+       one plank and every strike looks the same. */
+    var chest = new THREE.Object3D();
+    chest.position.y = TL * 0.30;
+    torso.add(chest);
+    rig.chest = chest;
+
+    /* muscle: pectorals and a stack of abdominals, sitting proud of the lathe */
+    var pecY = TL * 0.44, pecR = W * 0.30;
+    for (var pi = 0; pi < 2; pi++) {
+      var pec = ellip(chest, skinM, pecR, pecR * 0.62, pecR * 0.70,
+        (pi ? 1 : -1) * W * 0.32, pecY, W * 0.28);
+      pec.rotation.z = (pi ? -1 : 1) * 0.18;
+    }
+    for (var ai = 0; ai < 3; ai++) {
+      var absR = W * (0.26 - ai * 0.022);
+      ellip(chest, skinM, absR, absR * 0.52, absR * 0.44,
+        -absR * 0.55, pecY - TL * (0.20 + ai * 0.115), W * 0.20);
+      ellip(chest, skinM, absR, absR * 0.52, absR * 0.44,
+        absR * 0.55, pecY - TL * (0.20 + ai * 0.115), W * 0.20);
+    }
+    /* trapezius wedge — fills the neck-to-shoulder line */
+    var trap = ellip(chest, skinM, W * 0.86, W * 0.24, W * 0.42, 0, TL * 0.60, -W * 0.06);
+    out.trap = trap;
+
     /* neck */
-    var neck = tube(torso, skinM, W * 0.30, W * 0.34, TL * 0.14, 8);
-    neck.position.y = TL * 1.02;
+    var neck = tube(chest, skinM, W * 0.26, W * 0.30, TL * 0.16, 8);
+    neck.position.y = TL * 0.70;
 
     /* --- head ---------------------------------------------------------- */
     var headPivot = new THREE.Object3D();
-    headPivot.position.y = TL * 1.10;
-    torso.add(headPivot);
+    headPivot.position.y = TL * 0.78;
+    chest.add(headPivot);
     rig.head = headPivot;
 
     var hr = P.headR;
@@ -986,30 +1045,47 @@
     buildHeadExtras(headInner, spec, hr, out);
     buildHair(headInner, spec.hair, hr, out);
 
-    /* --- arms ---------------------------------------------------------- */
+    /* --- arms ------------------------------------------------------------
+       Mounted OUTSIDE the torso silhouette. The old rig hung them at 0.92W
+       while the clothed torso reached 1.03W, so every arm was buried in the
+       chest and no pose could be seen. The deltoid ball bridges the gap. */
+    P.shoulderX = W * 1.02;
     function arm(side) {
       var sh = new THREE.Object3D();
-      sh.position.set(side * W * 0.92, TL * 0.86, 0);
-      torso.add(sh);
-      /* deltoid */
-      var delt = ball(sh, skinM, W * 0.36, 0, 0, 0);
-      delt.scale.set(W * 0.36, W * 0.32, W * 0.34);
-      var upper = tube(sh, skinM, P.armR * 0.85, P.armR * 1.12, P.upperArm, 8);
+      sh.position.set(side * P.shoulderX, TL * 0.54, 0);
+      chest.add(sh);
+
+      var delt = ellip(sh, skinM, W * 0.33, W * 0.31, W * 0.32, 0, W * 0.04, 0);
+      delt.rotation.z = -side * 0.2;
+
+      var upper = tube(sh, skinM, P.armR * 0.92, P.armR * 1.20, P.upperArm, 8);
       upper.position.y = -P.upperArm * 0.5;
+      /* bicep — bulges on the front of the upper arm */
+      ellip(sh, skinM, P.armR * 1.05, P.armR * 1.45, P.armR * 1.08,
+        0, -P.upperArm * 0.40, P.armR * 0.14);
 
       var el = new THREE.Object3D();
       el.position.y = -P.upperArm;
       sh.add(el);
-      ball(el, skinM, P.armR * 0.95);
-      var fore = tube(el, skinM, P.armR * 0.78, P.armR * 0.95, P.foreArm, 8);
+      ball(el, skinM, P.armR * 1.00);
+      var fore = tube(el, skinM, P.armR * 0.74, P.armR * 1.02, P.foreArm, 8);
       fore.position.y = -P.foreArm * 0.5;
+      ellip(el, skinM, P.armR * 1.02, P.armR * 1.22, P.armR * 1.02,
+        0, -P.foreArm * 0.30, 0);
 
       var hand = new THREE.Object3D();
       hand.position.y = -P.foreArm;
       el.add(hand);
-      var fist = ball(hand, skinM, P.armR * 1.15);
-      fist.scale.set(P.armR * 1.15, P.armR * 1.32, P.armR * 0.98);
-      return { sh: sh, el: el, hand: hand };
+      /* a fist, not a ball: a rounded block of knuckles plus a thumb, so a
+         punch has something recognisable on the end of it */
+      var fist = ellip(hand, skinM, P.armR * 1.12, P.armR * 1.15, P.armR * 1.30,
+        0, -P.armR * 0.55, 0);
+      var knuck = ellip(hand, skinM, P.armR * 1.05, P.armR * 0.42, P.armR * 0.55,
+        0, -P.armR * 1.28, P.armR * 0.30);
+      var thumb = ellip(hand, skinM, P.armR * 0.34, P.armR * 0.55, P.armR * 0.40,
+        -side * P.armR * 0.95, -P.armR * 0.70, P.armR * 0.35);
+      thumb.rotation.z = side * 0.5;
+      return { sh: sh, el: el, hand: hand, fist: fist };
     }
     var aL = arm(-1), aR = arm(1);
     rig.armL = aL.sh; rig.foreL = aL.el; rig.handL = aL.hand;
@@ -1018,22 +1094,32 @@
     /* --- legs ---------------------------------------------------------- */
     function leg(side) {
       var hp = new THREE.Object3D();
-      hp.position.set(side * W * 0.42, 0, 0);
+      hp.position.set(side * W * 0.34, -TL * 0.04, 0);
       hips.add(hp);
-      var thigh = tube(hp, skinM, P.legR * 1.05, P.legR * 1.25, P.thigh, 8);
+      var thigh = tube(hp, skinM, P.legR * 0.92, P.legR * 1.30, P.thigh, 8);
       thigh.position.y = -P.thigh * 0.5;
+      /* quad mass high on the thigh */
+      ellip(hp, skinM, P.legR * 1.06, P.legR * 1.45, P.legR * 1.08,
+        0, -P.thigh * 0.32, P.legR * 0.10);
 
       var kn = new THREE.Object3D();
       kn.position.y = -P.thigh;
       hp.add(kn);
-      ball(kn, skinM, P.legR * 1.02);
-      var shin = tube(kn, skinM, P.legR * 0.82, P.legR * 1.0, P.shin, 8);
+      ball(kn, skinM, P.legR * 0.96);
+      var shin = tube(kn, skinM, P.legR * 0.72, P.legR * 0.98, P.shin, 8);
       shin.position.y = -P.shin * 0.5;
+      /* calf, set back so the leg has a profile */
+      ellip(kn, skinM, P.legR * 0.95, P.legR * 1.30, P.legR * 0.95,
+        0, -P.shin * 0.30, -P.legR * 0.20);
 
       var ft = new THREE.Object3D();
       ft.position.y = -P.shin;
       kn.add(ft);
-      var foot = plate(ft, skinM, P.legR * 2.1, P.legR * 0.9, P.legR * 3.4, 0, -P.legR * 0.35, P.legR * 0.9);
+      var foot = plate(ft, skinM, P.legR * 1.9, P.legR * 0.85, P.legR * 3.2,
+        0, -P.legR * 0.38, P.legR * 0.85);
+      /* toe cap rounds off the boot */
+      ellip(ft, skinM, P.legR * 0.95, P.legR * 0.55, P.legR * 0.75,
+        0, -P.legR * 0.38, P.legR * 2.3);
       return { hp: hp, kn: kn, ft: ft, foot: foot };
     }
     var lL = leg(-1), lR = leg(1);

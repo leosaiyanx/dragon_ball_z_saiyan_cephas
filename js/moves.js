@@ -33,13 +33,16 @@
 
   /* ============================ melee attacks =========================== */
   /* Combo strings. Each entry: pose, timings, damage scale, knockback.     */
+  /* Each step names an animation clip and the fraction of it at which the
+     damage lands, so the hit frame and the visible strike can never drift.
+     `cancel` is when the next attack may be buffered in. */
   var COMBO = [
-    { pose: 'punchR', wind: 0.055, hit: 0.055, rec: 0.10, dmg: 1.00, kb: 3, side: 1 },
-    { pose: 'punchL', wind: 0.050, hit: 0.055, rec: 0.10, dmg: 1.05, kb: 3, side: -1 },
-    { pose: 'kickR', wind: 0.065, hit: 0.060, rec: 0.13, dmg: 1.25, kb: 5, side: 1 },
-    { pose: 'punchR', wind: 0.055, hit: 0.055, rec: 0.10, dmg: 1.15, kb: 4, side: 1 },
-    { pose: 'kickSpin', wind: 0.075, hit: 0.065, rec: 0.15, dmg: 1.45, kb: 7, side: -1 },
-    { pose: 'smash', wind: 0.11, hit: 0.070, rec: 0.24, dmg: 2.20, kb: 22, launch: 1, big: 1, side: 1 }
+    { clip: 'jab', dur: 0.30, hit: 0.34, cancel: 0.56, dmg: 1.00, kb: 3, side: -1 },
+    { clip: 'cross', dur: 0.34, hit: 0.36, cancel: 0.58, dmg: 1.08, kb: 3, side: 1 },
+    { clip: 'kickRound', dur: 0.40, hit: 0.42, cancel: 0.68, dmg: 1.30, kb: 5, side: 1 },
+    { clip: 'hook', dur: 0.34, hit: 0.38, cancel: 0.60, dmg: 1.16, kb: 4, side: -1 },
+    { clip: 'kickSpin', dur: 0.46, hit: 0.44, cancel: 0.72, dmg: 1.50, kb: 7, side: 1 },
+    { clip: 'smash', dur: 0.52, hit: 0.46, cancel: 0.80, dmg: 2.20, kb: 22, launch: 1, big: 1, side: 1 }
   ];
 
   var RUSH_RANGE = 19;      /* auto-close distance for a locked-on strike */
@@ -48,7 +51,8 @@
   Mv.melee = function (f, world, heavy) {
     if (!f.canAct()) {
       /* allow buffering the next hit while recovering */
-      if (f.act && f.act.type === 'melee' && f.act.phase === 'rec' && f.act.step < 5) f.act.buffer = true;
+      if (f.act && f.act.type === 'melee' && f.act.step < 5 &&
+          f.act.t / f.act.c.dur >= f.act.c.cancel * 0.6) f.act.buffer = true;
       return false;
     }
     /* the five-hit string loops so a held button never stalls on one move */
@@ -61,10 +65,10 @@
     var c = COMBO[step];
     f.setState('melee');
     f.act = {
-      type: 'melee', step: step, c: c, t: 0, phase: 'wind', done: false,
-      heavy: !!heavy, buffer: false, rushed: false
+      type: 'melee', step: step, c: c, t: 0, done: false,
+      heavy: !!heavy, buffer: false, rushed: false, didHit: false
     };
-    f.setPose(POSE.windup, 26);
+    f.playClip(c.clip, c.dur);
 
     /* close the gap — this is what makes the game feel like the anime */
     var t = f.target;
@@ -90,25 +94,27 @@
   function meleeTick(f, dt, world) {
     var a = f.act, c = a.c;
     a.t += dt;
-    if (a.phase === 'wind') {
-      f.setPoseMix(POSE.windup, POSE[c.pose], M.sat(a.t / c.wind), 30);
-      if (a.t >= c.wind) { a.phase = 'hit'; a.t = 0; f.setPose(POSE[c.pose], 34); doMeleeHit(f, c, world); }
-    } else if (a.phase === 'hit') {
-      if (a.t >= c.hit) { a.phase = 'rec'; a.t = 0; }
-    } else {
-      if (a.t >= c.rec * (a.buffer ? 0.35 : 1)) {
-        var next = a.step + 1;
-        /* A queued special / ultimate / transformation outranks the combo —
-           otherwise a held attack button chains forever and the buffered
-           action never finds a frame where the fighter can act. */
-        var chain = (a.buffer || (f.autoCombo && f.holdAttack)) && !f.buf;
-        if (chain && next <= 4 && !a.heavy) {
-          startMelee(f, world, next, false);
-        } else {
-          f.act = null;
-          f.setState('idle');
-        }
-      }
+    var frac = a.t / c.dur;
+
+    if (!a.didHit && frac >= c.hit) {
+      a.didHit = true;
+      doMeleeHit(f, c, world);
+    }
+
+    if (frac < c.cancel) return;
+
+    var next = a.step + 1;
+    /* A queued special / ultimate / transformation outranks the combo —
+       otherwise a held attack button chains forever and the buffered
+       action never finds a frame where the fighter can act. */
+    var chain = (a.buffer || (f.autoCombo && f.holdAttack)) && !f.buf;
+    if (chain && next <= 4 && !a.heavy) {
+      startMelee(f, world, next, false);
+      return;
+    }
+    if (frac >= 1) {
+      f.act = null;
+      f.setState('idle');
     }
   }
 
@@ -563,14 +569,16 @@
     f.faceLock = 0;
     f.snapFace();
     var arch = def.arch;
-    if (arch === 'beam') f.setPose(POSE.beamCharge, 16);
-    else if (arch === 'sphere') f.setPose(POSE.throwOver, 14);
-    else if (arch === 'barrage') f.setPose(POSE.palmOut, 20);
-    else if (arch === 'disc') f.setPose(POSE.throwOver, 18);
-    else if (arch === 'nova') f.setPose(POSE.roar, 14);
-    else if (arch === 'swarm') f.setPose(POSE.roar, 14);
-    else if (arch === 'rush') f.setPose(POSE.windup, 22);
-    else if (arch === 'buff' || arch === 'trick') f.setPose(POSE.roar, 14);
+    /* One clip covers the whole move — wind-up, release and recovery — so the
+       body flows through it instead of snapping between two held poses. */
+    var T = TIMING[arch] || TIMING.nova;
+    var wind = T[0] * (isUlt ? 1.5 : 1);
+    if (arch === 'beam') wind = (def.charge || 1) * (isUlt ? 0.85 : 0.62);
+    var total = wind + T[1] * (isUlt ? 1.35 : 1) + T[2];
+    var clipName = C.Anim.archClip[arch] || 'nova';
+    f.act.clipTotal = total;
+    f.act.windFrac = wind / total;
+    f.playClip(clipName, total, { hold: arch === 'beam' });
     C.bus.emit('special', { fighter: f, def: def, ult: !!isUlt });
     return true;
   };
@@ -662,7 +670,6 @@
       case 'beam': {
         var lh = f.handPos(-1, _v), rh = f.handPos(1, _v2);
         origin.set((lh.x + rh.x) * 0.5, (lh.y + rh.y) * 0.5, (lh.z + rh.z) * 0.5);
-        f.setPose(POSE.beamFire, 30);
         var dur = ult ? 1.5 : 0.95;
         Mv.spawnBeam({
           owner: f, origin: origin, dir: dir,
@@ -677,7 +684,6 @@
         break;
       }
       case 'sphere': {
-        f.setPose(POSE.throwOver, 26);
         var sp = def.sky ? 26 : 34;
         var from = def.sky ? _v.set(f.pos.x, f.pos.y + f.height * 1.6, f.pos.z) : origin;
         Mv.spawnProj({
@@ -689,7 +695,6 @@
         break;
       }
       case 'disc': {
-        f.setPose(POSE.throwOver, 26);
         var n = def.count || 1;
         for (var i = 0; i < n; i++) {
           var d2 = dir.clone();
@@ -704,7 +709,6 @@
         break;
       }
       case 'nova': {
-        f.setPose(POSE.roar, 22);
         var r = (def.radius || 9) * (ult ? 1.4 : 1);
         var c = f.chest(_v);
         explode(c, def.color, r, (def.dmg || 800) * mul * 0.9, f, null, world);
@@ -718,7 +722,6 @@
       case 'barrage': {
         a.shots = def.count || 12;
         a.shotT = 0;
-        f.setPose(POSE.palmOut, 26);
         break;
       }
       case 'swarm': {
@@ -824,7 +827,7 @@
     f.vel.set(0, 0, 0);
     f.flying = true; f.grounded = false;
     FX.ghost(f.model, f.auraColor, 0.22, 0.6);
-    f.setPose(a.done % 2 ? POSE.punchR : POSE.punchL, 40);
+    f.playClip('rushHit', 0.9 / Math.max(1, a.hits) * 1.6);
 
     var last = a.done >= a.hits;
     var base = (def.dmg ? def.dmg / a.hits : (a.ult ? 260 : 150));
@@ -1036,7 +1039,7 @@
     if (f.ki < 2) return false;
     f.ki -= 2;
     f.kiShotT = 0.13;
-    if (f.canAct()) { f.setPose(POSE.palmOut, 30); f.faceLock = 0.18; }
+    if (f.canAct()) { f.playClip('kiShot', 0.26); f.faceLock = 0.18; }
     var side = (f.kiSide = -(f.kiSide || -1));
     var origin = f.handPos(side, new THREE.Vector3());
     var dir = f.aim(new THREE.Vector3());

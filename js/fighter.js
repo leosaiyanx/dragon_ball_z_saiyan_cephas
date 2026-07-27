@@ -73,164 +73,12 @@
     return mesh;
   }
 
-  /* ============================ pose plumbing =========================== */
-  var PKEYS = ['hipY', 'hipsX', 'hipsY', 'hipsZ', 'torsoX', 'torsoY', 'torsoZ',
-    'headX', 'headY', 'headZ',
-    'aLX', 'aLY', 'aLZ', 'fLX', 'aRX', 'aRY', 'aRZ', 'fRX',
-    'lLX', 'lLZ', 'sLX', 'lRX', 'lRZ', 'sRX', 'ftLX', 'ftRX'];
-
-  function P(o) {
-    var p = {};
-    for (var i = 0; i < PKEYS.length; i++) p[PKEYS[i]] = 0;
-    if (o) for (var k in o) if (p[k] !== undefined || k === 'hipY') p[k] = o[k];
-    return p;
-  }
-
-  /* The fighting stance every other pose is measured against. */
-  var POSE = {
-    stance: P({
-      torsoX: 0.07, torsoY: 0.16, hipsY: -0.10,
-      aLX: -0.34, aLZ: -0.17, fLX: -0.92,
-      aRX: -0.46, aRZ: 0.20, fRX: -1.10,
-      lLX: -0.16, lLZ: 0.19, sLX: 0.30, ftLX: -0.14,
-      lRX: -0.10, lRZ: -0.21, sRX: 0.24, ftRX: -0.10,
-      headY: -0.10
-    }),
-    fly: P({
-      torsoX: 0.50, hipY: 0.02,
-      aLX: 1.20, aLZ: 0.28, fLX: -0.35,
-      aRX: 1.20, aRZ: -0.28, fRX: -0.35,
-      lLX: 0.28, lLZ: 0.08, sLX: -0.30,
-      lRX: 0.28, lRZ: -0.08, sRX: -0.30,
-      headX: -0.45
-    }),
-    dash: P({
-      torsoX: 0.95,
-      aLX: 2.45, aLZ: 0.16, fLX: -0.20,
-      aRX: 2.45, aRZ: -0.16, fRX: -0.20,
-      lLX: 0.45, sLX: -0.55, lRX: 0.35, sRX: -0.45,
-      headX: -0.75
-    }),
-    charge: P({
-      torsoX: -0.22, hipsY: 0,
-      aLX: 0.55, aLZ: 0.85, fLX: -0.55,
-      aRX: 0.55, aRZ: -0.85, fRX: -0.55,
-      lLX: -0.22, lLZ: 0.30, sLX: 0.46, ftLX: -0.20,
-      lRX: -0.22, lRZ: -0.30, sRX: 0.46, ftRX: -0.20,
-      headX: -0.35
-    }),
-    guard: P({
-      torsoX: 0.24, hipsY: -0.05,
-      aLX: -1.30, aLY: 0.55, aLZ: 0.55, fLX: -1.85,
-      aRX: -1.30, aRY: -0.55, aRZ: -0.55, fRX: -1.85,
-      lLX: -0.28, lLZ: 0.22, sLX: 0.52, lRX: -0.28, lRZ: -0.22, sRX: 0.52,
-      headX: 0.18
-    }),
-    punchR: P({
-      torsoY: -0.52, torsoX: 0.14,
-      aRX: -1.62, aRY: -0.10, aRZ: -0.06, fRX: -0.10,
-      aLX: -0.20, aLZ: 0.95, fLX: -2.20,
-      lLX: -0.18, lLZ: 0.18, sLX: 0.34, lRX: -0.05, lRZ: -0.16, sRX: 0.20
-    }),
-    punchL: P({
-      torsoY: 0.52, torsoX: 0.14,
-      aLX: -1.62, aLY: 0.10, aLZ: 0.06, fLX: -0.10,
-      aRX: -0.20, aRZ: -0.95, fRX: -2.20,
-      lRX: -0.18, lRZ: -0.18, sRX: 0.34, lLX: -0.05, lLZ: 0.16, sLX: 0.20
-    }),
-    kickR: P({
-      torsoX: -0.30, torsoY: -0.30, hipsX: -0.20,
-      lRX: -1.45, lRZ: -0.22, sRX: 0.16, ftRX: -0.30,
-      lLX: 0.10, lLZ: 0.10, sLX: 0.16,
-      aLX: -0.60, aLZ: 1.10, fLX: -1.30, aRX: 0.70, aRZ: -0.85, fRX: -0.90
-    }),
-    kickSpin: P({
-      torsoX: -0.10, torsoY: 0.55, hipsX: -0.32,
-      lRX: -1.30, lRZ: -0.65, sRX: 0.10,
-      lLX: 0.24, lLZ: 0.16, sLX: 0.50,
-      aLX: -0.30, aLZ: 1.40, aRX: -0.30, aRZ: -1.40
-    }),
-    smash: P({
-      torsoX: 0.55, hipsX: 0.20,
-      aLX: -2.65, aLZ: 0.22, fLX: -0.28,
-      aRX: -2.65, aRZ: -0.22, fRX: -0.28,
-      lLX: -0.15, sLX: 0.35, lRX: -0.15, sRX: 0.35,
-      headX: 0.30
-    }),
-    windup: P({
-      torsoX: -0.42, torsoY: 0.62,
-      aRX: 0.95, aRY: -0.30, aRZ: -0.55, fRX: -1.95,
-      aLX: -0.65, aLZ: 0.75, fLX: -1.15,
-      lLX: -0.24, lLZ: 0.24, sLX: 0.48, lRX: -0.20, lRZ: -0.24, sRX: 0.40
-    }),
-    beamCharge: P({
-      torsoY: 0.62, torsoX: 0.05, hipsY: 0.30,
-      aLX: -0.55, aLY: 1.25, aLZ: 0.55, fLX: -1.55,
-      aRX: -0.55, aRY: 1.25, aRZ: -0.10, fRX: -1.55,
-      lLX: -0.28, lLZ: 0.30, sLX: 0.55, ftLX: -0.24,
-      lRX: -0.24, lRZ: -0.30, sRX: 0.50, ftRX: -0.20,
-      headY: -0.55
-    }),
-    beamFire: P({
-      torsoY: -0.10, torsoX: 0.16, hipsY: -0.05,
-      aLX: -1.58, aLY: 0.30, aLZ: 0.26, fLX: -0.16,
-      aRX: -1.58, aRY: -0.30, aRZ: -0.26, fRX: -0.16,
-      lLX: -0.30, lLZ: 0.24, sLX: 0.52, lRX: -0.10, lRZ: -0.24, sRX: 0.28,
-      headX: -0.08
-    }),
-    throwOver: P({
-      torsoX: 0.35, torsoY: -0.25,
-      aRX: -2.85, aRZ: -0.14, fRX: -0.20,
-      aLX: -0.80, aLZ: 0.90, fLX: -1.20,
-      lLX: -0.18, sLX: 0.32, lRX: -0.10, sRX: 0.24
-    }),
-    palmOut: P({
-      torsoY: -0.28, torsoX: 0.10,
-      aRX: -1.58, aRY: -0.16, aRZ: -0.10, fRX: -0.05,
-      aLX: -0.45, aLZ: 0.85, fLX: -1.40,
-      lLX: -0.22, lLZ: 0.20, sLX: 0.40, lRX: -0.12, lRZ: -0.20, sRX: 0.28
-    }),
-    roar: P({
-      torsoX: -0.42, hipsY: 0.12,
-      aLX: 0.70, aLZ: 1.35, fLX: -0.85,
-      aRX: 0.70, aRZ: -1.35, fRX: -0.85,
-      lLX: -0.30, lLZ: 0.38, sLX: 0.62, ftLX: -0.28,
-      lRX: -0.30, lRZ: -0.38, sRX: 0.62, ftRX: -0.28,
-      headX: -0.62
-    }),
-    hit: P({
-      torsoX: -0.55, hipsX: 0.28, hipsY: 0.18, hipY: -0.06,
-      aLX: 0.60, aLZ: 0.95, fLX: -0.75,
-      aRX: 0.60, aRZ: -0.95, fRX: -0.75,
-      lLX: 0.24, lLZ: 0.26, sLX: 0.62, lRX: 0.10, lRZ: -0.24, sRX: 0.48,
-      headX: -0.55
-    }),
-    blow: P({
-      torsoX: -0.85, hipsX: 0.45,
-      aLX: 1.85, aLZ: 1.05, fLX: -0.35,
-      aRX: 1.85, aRZ: -1.05, fRX: -0.35,
-      lLX: 0.62, lLZ: 0.22, sLX: 0.35, lRX: 0.42, lRZ: -0.20, sRX: 0.25,
-      headX: -0.85
-    }),
-    down: P({
-      hipY: -0.72, hipsX: -1.42, torsoX: 0.16,
-      aLX: 0.65, aLZ: 1.42, aRX: 0.65, aRZ: -1.42,
-      lLX: 0.22, lLZ: 0.22, sLX: 0.35, lRX: 0.16, lRZ: -0.22, sRX: 0.28,
-      headX: 0.35
-    }),
-    victory: P({
-      torsoX: -0.10, hipsY: 0.14,
-      aRX: -2.75, aRZ: -0.32, fRX: -0.30,
-      aLX: -0.35, aLZ: 0.55, fLX: -1.65,
-      lLX: -0.10, lLZ: 0.14, sLX: 0.18, lRX: -0.10, lRZ: -0.14, sRX: 0.18,
-      headX: -0.22
-    }),
-    intro: P({
-      torsoX: 0.02, aLZ: 0.16, aRZ: -0.16, fLX: -0.25, fRX: -0.25,
-      lLZ: 0.08, lRZ: -0.08
-    })
-  };
-  C.POSE = POSE;
+  /* ============================ pose plumbing ===========================
+     Poses and clips live in js/anim.js; this file just plays them back. */
+  var A = C.Anim;
+  var PKEYS = A.KEYS;
+  var P = A.P;
+  var POSE = A.POSE;
 
   /* ============================== Fighter =============================== */
   function Fighter(spec, opts) {
@@ -362,6 +210,43 @@
     this.poseBlend = blend === undefined ? 20 : blend;
   };
 
+  /* ------------------------------------------------------------ clips ----
+     Play a keyframed animation from js/anim.js. `dur` overrides the clip's
+     own length so a move's timing and its animation always agree.        */
+  Fighter.prototype.playClip = function (name, dur, opts) {
+    var cl = A.CLIP[name];
+    if (!cl) return false;
+    this.clip = {
+      def: cl, name: name, t: 0,
+      dur: dur || cl.dur,
+      hold: !!(opts && opts.hold) || !!cl.hold,
+      mirror: !!(opts && opts.mirror)
+    };
+    if (!this._clipPose) this._clipPose = P();
+    return true;
+  };
+
+  Fighter.prototype.stopClip = function () { this.clip = null; };
+
+  Fighter.prototype.clipDone = function () {
+    return !this.clip || this.clip.t >= 1;
+  };
+
+  Fighter.prototype.updateClip = function (dt) {
+    var c = this.clip;
+    if (!c) return false;
+    c.t += dt / Math.max(0.02, c.dur);
+    if (c.t >= 1 && !c.hold) { this.clip = null; return false; }
+    A.sample(c.def, Math.min(1, c.t), this._clipPose);
+    /* a clip drives the target directly and snaps hard — the keyframes
+       already carry the easing, so a slow blend would only smear them */
+    for (var i = 0; i < PKEYS.length; i++) {
+      this.poseTarget[PKEYS[i]] = this._clipPose[PKEYS[i]];
+    }
+    this.poseBlend = 40;
+    return true;
+  };
+
   Fighter.prototype.applyPose = function (dt) {
     var p = this.pose, t = this.poseTarget, r = this.rig;
     var k = 1 - Math.exp(-this.poseBlend * dt);
@@ -370,20 +255,28 @@
       p[key] += (t[key] - p[key]) * k;
     }
 
-    /* idle life: breathing, weight shift, hair and cloth sway */
+    /* Idle life, layered on top of whatever pose is playing. A fighter that
+       holds perfectly still reads as a statue no matter how good the pose. */
     var bt = this.animT;
-    var breathe = this.state === 'ko' ? 0 : Math.sin(bt * 2.4) * 0.02;
+    var alive = this.alive && this.state !== 'ko';
+    var breathe = alive ? Math.sin(bt * 2.3) * 0.022 : 0;
+    var sway2 = alive ? Math.sin(bt * 1.15) * 0.030 : 0;   /* slow weight shift */
+    var bounce = alive ? Math.sin(bt * 2.3 + 1.2) * 0.006 : 0;
     var bob = 0;
-    if (this.state === 'fly' || this.state === 'idle' && !this.grounded) bob = Math.sin(bt * 1.8) * 0.05;
+    if (!this.grounded || this.flying) bob = Math.sin(bt * 1.7) * 0.05;
 
-    r.hips.position.y = this.P.hipY + p.hipY * this.height + breathe * 0.4 + bob;
-    r.hips.rotation.set(p.hipsX, p.hipsY, p.hipsZ);
-    r.torso.rotation.set(p.torsoX + breathe, p.torsoY, p.torsoZ);
-    r.head.rotation.set(p.headX - breathe * 0.5, p.headY, p.headZ);
-    r.armL.rotation.set(p.aLX, p.aLY, p.aLZ);
-    r.armR.rotation.set(p.aRX, p.aRY, p.aRZ);
+    r.hips.position.y = this.P.hipY + p.hipY * this.height + bounce + bob;
+    r.hips.rotation.set(p.hipsX, p.hipsY + sway2 * 0.5, p.hipsZ + sway2 * 0.35);
+    r.torso.rotation.set(p.torsoX + breathe, p.torsoY, p.torsoZ - sway2 * 0.25);
+    if (r.chest) r.chest.rotation.set(p.chestX + breathe * 0.8, p.chestY, p.chestZ);
+    /* the head counter-rotates a little so it stays levelled at the target */
+    r.head.rotation.set(p.headX - breathe * 0.6, p.headY - sway2 * 0.4, p.headZ);
+    r.armL.rotation.set(p.aLX + breathe * 0.5, p.aLY, p.aLZ - breathe * 0.6);
+    r.armR.rotation.set(p.aRX + breathe * 0.5, p.aRY, p.aRZ + breathe * 0.6);
     r.foreL.rotation.x = p.fLX;
     r.foreR.rotation.x = p.fRX;
+    if (r.handL) r.handL.rotation.x = p.hLX;
+    if (r.handR) r.handR.rotation.x = p.hRX;
     r.legL.rotation.set(p.lLX, 0, p.lLZ);
     r.legR.rotation.set(p.lRX, 0, p.lRZ);
     r.shinL.rotation.x = p.sLX;
@@ -453,7 +346,7 @@
     this.aura.material.uniforms.uCore.value.set(1, 1, 1);
     this.auraCore.material.uniforms.uColor.value.copy(c).multiplyScalar(1.4);
     this.auraCore.material.uniforms.uCore.value.set(1.4, 1.4, 1.4);
-    this.baseGlow = f ? (f.glow || 0.6) : 0.16;
+    this.baseGlow = f ? (f.glow || 0.6) : 0.10;
   };
 
   Fighter.prototype.form = function () {
@@ -498,6 +391,7 @@
        animation; taking a full combo on top of that just teaches players to
        never press the most exciting button in the game. */
     this.invuln = Math.max(this.invuln, 1.0);
+    this.playClip('transform', 0.95);
     this.kiDrain = f.kiDrain;
     C.bus.emit('transform', { fighter: this, form: f });
     return true;
@@ -682,9 +576,12 @@
         this.setState('blow');
         this.stunT = info.stun || 0.85;
         this.grounded = false;
+        this.playClip('hitHeavy', Math.max(0.4, this.stunT), { hold: true });
       } else {
         this.setState('hit');
         this.stunT = info.stun || 0.28;
+        /* a short recoil clip, so being hit is a motion and not a held pose */
+        this.playClip('hitLight', Math.max(0.22, this.stunT * 1.1));
       }
       this.act = null;
       this.chargeT = 0;
@@ -759,16 +656,19 @@
       this.guard = Math.min(100, this.guard + (this.state === 'guard' ? 3 : 16) * dt);
     }
 
-    /* --- state timers --- */
+    /* --- state timers ---
+       A running clip owns the pose; these states only set one when there is
+       no clip, so an attack animation is never stomped mid-swing. */
+    var clipRunning = this.updateClip(dt);
     switch (this.state) {
       case 'hit':
         this.stunT -= dt;
-        this.setPose(POSE.hit, 22);
+        if (!clipRunning) this.setPose(POSE.hit, 22);
         if (this.stunT <= 0) this.setState('idle');
         break;
       case 'blow':
         this.stunT -= dt;
-        this.setPose(POSE.blow, 9);
+        if (!clipRunning) this.setPose(POSE.blow, 9);
         if (this.stunT <= 0) {
           if (this.grounded) { this.setState('down'); this.downT = 0.55; }
           else this.setState('idle');
@@ -776,6 +676,7 @@
         break;
       case 'down':
         this.downT -= dt;
+        this.stopClip();
         this.setPose(POSE.down, 12);
         if (this.downT <= 0) { this.setState('rise'); }
         break;
@@ -784,11 +685,12 @@
         if (this.stateT > 0.32) { this.setState('idle'); this.invuln = 0.25; }
         break;
       case 'ko':
+        this.stopClip();
         this.setPose(POSE.down, 6);
         break;
       case 'transform':
-        this.setPose(POSE.roar, 10);
-        if (this.stateT > 0.9) this.setState('idle');
+        if (!clipRunning) this.setPose(POSE.roar, 10);
+        if (this.stateT > 0.95) this.setState('idle');
         break;
       case 'vanish':
         if (this.stateT > 0.14) { this.setState('idle'); }
@@ -796,10 +698,23 @@
       case 'charge':
         this.chargeT += dt;
         this.ki = Math.min(this.maxKi, this.ki + this.kiCharge * dt);
+        this.stopClip();
+        /* the strain shake — a charging fighter should vibrate, not pose */
+        var q = 1 + Math.min(1.6, this.chargeT * 0.8);
         this.setPose(POSE.charge, 14);
+        this.poseTarget.torsoX += Math.sin(this.animT * 34) * 0.020 * q;
+        this.poseTarget.chestX += Math.sin(this.animT * 41 + 1) * 0.022 * q;
+        this.poseTarget.headX += Math.sin(this.animT * 37 + 2) * 0.030 * q;
+        this.poseTarget.aLZ += Math.sin(this.animT * 44) * 0.030 * q;
+        this.poseTarget.aRZ -= Math.sin(this.animT * 44) * 0.030 * q;
+        this.poseTarget.hipY += Math.abs(Math.sin(this.animT * 22)) * 0.008 * q;
         break;
       case 'guard':
+        this.stopClip();
         this.setPose(POSE.guard, 18);
+        /* absorb-the-blow micro-recoil while blocking */
+        var gr = Math.max(0, 0.25 - (this.animT - this.lastHitTime)) * 4;
+        if (gr > 0) { this.poseTarget.torsoX -= gr * 0.18; this.poseTarget.hipY -= gr * 0.02; }
         break;
     }
 
@@ -904,8 +819,15 @@
     if (this.transformFlash > 0) want = Math.max(want, this.transformFlash * 2.6);
 
     this.auraLevel = M.damp(this.auraLevel === undefined ? 0 : this.auraLevel, want, 9, dt);
-    u.uIntensity.value = this.auraLevel * 0.65;
-    u2.uIntensity.value = this.auraLevel * 0.55;
+    /* Non-linear so a resting fighter's aura all but disappears. A linear
+       ramp left a faintly lit cone around everyone at all times, which read
+       as a glass lampshade rather than as ki. */
+    var lv = Math.pow(Math.max(0, this.auraLevel), 1.7);
+    var show = this.auraLevel > 0.20;
+    this.aura.visible = show;
+    this.auraCore.visible = show;
+    u.uIntensity.value = lv * 0.70;
+    u2.uIntensity.value = lv * 0.58;
     var s = 1 + this.auraLevel * 0.10;
     this.aura.scale.set(s, 1 + this.auraLevel * 0.20, s);
 
@@ -930,37 +852,81 @@
     }
   };
 
-  /* run / fly cycle layered on top of whatever pose is active */
+  /* Locomotion and the standing idle. Layered over the stance, never
+     replacing it, so a fighter always looks ready rather than parked. */
   Fighter.prototype.animateLocomotion = function (dt) {
+    if (this.clip) return;                       /* a clip owns the pose */
     if (this.busy() || this.state === 'charge' || this.state === 'guard') return;
-    var sp = Math.hypot(this.vel.x, this.vel.z);
     if (!this.alive) return;
+    var sp = Math.hypot(this.vel.x, this.vel.z);
+    var p = this.poseTarget, i;
+    var bt = this.animT;
+
+    function base(src) {
+      for (i = 0; i < PKEYS.length; i++) p[PKEYS[i]] = src[PKEYS[i]];
+    }
 
     if (!this.grounded || this.flying) {
-      if (sp > this.flySpd * 0.55) this.setPose(POSE.dash, 10);
-      else if (sp > 0.6 || !this.grounded) this.setPose(POSE.fly, 8);
-      else this.setPose(POSE.stance, 10);
+      if (sp > this.flySpd * 0.55) { this.setPose(POSE.dash, 10); return; }
+      if (sp > 0.6 || !this.grounded) {
+        /* hovering: legs trail and drift, arms float — not a frozen T-pose */
+        base(POSE.fly);
+        var f2 = Math.sin(bt * 1.9), g2 = Math.cos(bt * 1.5);
+        p.lLX += f2 * 0.10; p.lRX -= f2 * 0.09;
+        p.sLX += g2 * 0.08; p.sRX -= g2 * 0.07;
+        p.aLZ -= f2 * 0.07; p.aRZ += f2 * 0.07;
+        p.torsoX += g2 * 0.05;
+        this.poseBlend = 9;
+        return;
+      }
+      this.setPose(POSE.stance, 10);
       return;
     }
 
-    if (sp < 0.45) { this.setPose(POSE.stance, 10); return; }
+    if (sp < 0.45) {
+      /* Standing idle: a boxer's bounce. Small, fast, and constant — this is
+         the difference between a fighting game and a diorama. */
+      base(POSE.stance);
+      var b = Math.sin(bt * 3.4);
+      var b2 = Math.sin(bt * 3.4 + 0.9);
+      p.hipY += (Math.abs(b) - 0.5) * 0.016;
+      p.sLX += Math.abs(b) * 0.10;
+      p.sRX += Math.abs(b2) * 0.09;
+      p.lLX -= Math.abs(b) * 0.05;
+      p.lRX -= Math.abs(b2) * 0.04;
+      /* fists breathe in and out of guard */
+      p.fLX += b * 0.075;
+      p.fRX -= b2 * 0.065;
+      p.aLX += b * 0.045;
+      p.aRX -= b2 * 0.040;
+      p.chestY += b * 0.035;
+      p.hipsY -= b * 0.028;
+      this.poseBlend = 13;
+      return;
+    }
 
-    /* grounded run: a stance with swinging limbs */
-    var cyc = this.animT * M.clamp(sp * 1.5, 5, 16);
+    /* Grounded run: contralateral swing with a real knee lift and a bob. */
+    var cyc = bt * M.clamp(sp * 1.6, 6, 17);
     var s = Math.sin(cyc), c = Math.cos(cyc);
-    var amp = M.clamp(sp / this.moveSpd, 0.3, 1.2);
-    var p = this.poseTarget;
-    for (var i = 0; i < PKEYS.length; i++) p[PKEYS[i]] = POSE.stance[PKEYS[i]];
-    p.lLX += s * 0.85 * amp;
-    p.lRX += -s * 0.85 * amp;
-    p.sLX += Math.max(0, -s) * 1.1 * amp;
-    p.sRX += Math.max(0, s) * 1.1 * amp;
-    p.aLX += -s * 0.55 * amp;
-    p.aRX += s * 0.55 * amp;
-    p.torsoX += 0.16 * amp;
-    p.hipY = Math.abs(c) * 0.012 * amp;
-    p.hipsY += s * 0.12 * amp;
-    this.poseBlend = 18;
+    var amp = M.clamp(sp / this.moveSpd, 0.35, 1.25);
+    base(POSE.stance);
+    p.lLX += s * 0.95 * amp;
+    p.lRX += -s * 0.95 * amp;
+    /* the trailing leg folds; the leading one straightens to plant */
+    p.sLX += Math.max(0, -s) * 1.30 * amp;
+    p.sRX += Math.max(0, s) * 1.30 * amp;
+    p.ftLX += -Math.max(0, -s) * 0.30 * amp;
+    p.ftRX += -Math.max(0, s) * 0.30 * amp;
+    p.aLX += -s * 0.60 * amp;
+    p.aRX += s * 0.60 * amp;
+    p.fLX += -Math.abs(s) * 0.25 * amp;
+    p.fRX += -Math.abs(s) * 0.25 * amp;
+    p.torsoX += 0.15 * amp;
+    p.hipY += (Math.abs(c) - 0.5) * 0.030 * amp;
+    p.hipsY += s * 0.16 * amp;
+    p.chestY += -s * 0.20 * amp;         /* shoulders counter the hips */
+    p.headY += s * 0.05 * amp;
+    this.poseBlend = 20;
   };
 
   /* ------------------------------------------------------------- movement */
@@ -1028,6 +994,7 @@
       this.snapFace();
     }
     this.vel.multiplyScalar(0.1);
+    this.stopClip();
     this.setState('vanish');
     this.invuln = 0.28;
     this.stunT = 0;
@@ -1057,6 +1024,7 @@
     this.shield = 0;
     this.blind = this.bound = this.slowT = this.markT = this.dizzy = 0;
     while (this.formIdx >= 0) this.revert();
+    this.stopClip();
     this.setPose(POSE.stance, 999);
     this.syncTransform();
   };

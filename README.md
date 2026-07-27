@@ -89,6 +89,11 @@ Pick **2 Players** for split screen on one keyboard. Player 2 uses
 - **Story Mode** — 9 sagas, **50 fights**, from Raditz landing on Earth to the
   last stand against Jiren.
 - **Versus, 2-Player split screen, World Tournament, Survival and Training.**
+- **Hand-keyframed animation** — every strike has anticipation, a fast
+  contact frame and a follow-through, driven by a clip system rather than
+  snapping between two poses. Hips and shoulders counter-rotate through a
+  punch, fighters bounce on their toes at rest, and the run has a real
+  contralateral swing.
 - **Real combat** — 5-hit combos into launchers, ki blasts, chargeable beams,
   homing discs, orb swarms, teleport rush attacks, guard breaks, vanishing
   counters, transformations, ultimates, and **beam struggles** (fire a beam into
@@ -143,6 +148,7 @@ two scales, composite with radial blur and vignette).
 | `js/core.js` | Maths, settings, save data, difficulty tiers |
 | `js/roster.js` | All 79 fighters as data |
 | `js/build.js` | Turns a roster row into a posable 3D rig |
+| `js/anim.js` | The pose library and keyframed animation clips |
 | `js/fighter.js` | Physics, resources, animation, the ki aura shader |
 | `js/moves.js` | Combos, projectiles, beams, beam struggles |
 | `js/ai.js` | Perception → reflexes → utility planning |

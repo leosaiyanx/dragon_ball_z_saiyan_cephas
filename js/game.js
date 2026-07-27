@@ -459,7 +459,7 @@
     /* Holding the attack button keeps swinging. Without this a held button
        throws exactly one combo and then goes quiet, which is the first thing
        anyone does and the first thing that would feel broken. */
-    if (pad.pressed('attack') || (pad.held.attack && f.canAct() && !f.act)) {
+    if (pad.pressed('attack') || (pad.held.attack && f.canAct() && !f.act && !f.buf)) {
       Mv.melee(f, G.arena, false);
     }
     if (pad.pressed('heavy')) Mv.melee(f, G.arena, true);
@@ -469,26 +469,46 @@
     var slots = ['s1', 's2', 's3', 's4'];
     for (var i = 0; i < 4; i++) {
       if (pad.pressed(slots[i])) {
-        var def = f.spec[slots[i]];
-        if (def) {
-          if (!Mv.special(f, G.arena, def, false)) {
-            if (f.ki < Mv.costOf(def)) U.toast('Not enough ki — hold CHARGE');
-          }
-        }
+        if (f.spec[slots[i]]) f.buf = { kind: slots[i], t: 1.1 };
       }
     }
     if (pad.pressed('ult')) {
-      if (f.ult >= 100) Mv.special(f, G.arena, f.spec.ult, true);
+      if (f.ult >= 100) f.buf = { kind: 'ult', t: 1.1 };
       else U.toast('Ultimate needs a full orange bar (' + Math.floor(f.ult) + '%)');
     }
     if (pad.pressed('transform')) {
-      if (f.canTransform()) {
-        if (f.canAct()) { f.setState('transform'); f.transform(); }
-      } else if (f.formIdx + 1 >= f.spec.forms.length) {
+      if (f.canTransform()) f.buf = { kind: 'transform', t: 1.4 };
+      else if (f.formIdx + 1 >= f.spec.forms.length) {
         U.toast(f.spec.forms.length ? 'Already at maximum power' : f.spec.short + ' has no transformations');
       } else {
         U.toast('Need ' + f.spec.forms[f.formIdx + 1].cost + '% ki to become ' +
           f.spec.forms[f.formIdx + 1].name);
+      }
+    }
+
+    /* Specials, ultimates and transformations all buffer. Press one at any
+       point — mid-combo, mid-recovery — and it fires the moment the fighter
+       can act again. Without this a player holding the attack button can
+       never transform, because the auto-combo never leaves an opening. */
+    if (f.buf) {
+      f.buf.t -= dt;
+      if (f.buf.t <= 0) {
+        f.buf = null;
+      } else if (f.canAct()) {
+        var k = f.buf.kind;
+        if (k === 'transform') {
+          if (f.canTransform()) { f.setState('transform'); f.transform(); f.buf = null; }
+          else f.buf = null;
+        } else if (k === 'ult') {
+          if (Mv.special(f, G.arena, f.spec.ult, true)) f.buf = null;
+        } else {
+          var def = f.spec[k];
+          if (Mv.special(f, G.arena, def, false)) f.buf = null;
+          else if (f.ki < Mv.costOf(def)) {
+            U.toast('Not enough ki — hold CHARGE');
+            f.buf = null;
+          }
+        }
       }
     }
     if (pad.pressed('revert')) f.revert();

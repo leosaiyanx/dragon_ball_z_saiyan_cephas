@@ -98,7 +98,10 @@
     } else {
       if (a.t >= c.rec * (a.buffer ? 0.35 : 1)) {
         var next = a.step + 1;
-        var chain = a.buffer || (f.autoCombo && f.holdAttack);
+        /* A queued special / ultimate / transformation outranks the combo —
+           otherwise a held attack button chains forever and the buffered
+           action never finds a frame where the fighter can act. */
+        var chain = (a.buffer || (f.autoCombo && f.holdAttack)) && !f.buf;
         if (chain && next <= 4 && !a.heavy) {
           startMelee(f, world, next, false);
         } else {

@@ -123,6 +123,7 @@ Other tools:
 
 | Command | What it does |
 |---|---|
+| `python3 tools/release.py` | **Run this before every push.** Bumps the service-worker cache and rebuilds the standalone file and the printable card. Skip it and returning players keep the old version. |
 | `python3 tools/bundle.py` | Rebuilds the single-file `dist/SaiyanCephas-standalone.html` |
 | `python3 tools/make_icons.py` | Redraws the app icons (needs `pillow`) |
 | `python3 tools/make_qr.py <url> <out.png>` | Makes a QR code (needs `segno`) |

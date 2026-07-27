@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Dragon Ball Z: Saiyan Cephas</title>
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#05070f">
+  <meta name="description"
+    content="A 3D Dragon Ball Z fighting game with 79 fighters from Z, GT, Super and the movies — built for Cephas Emokpae.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Saiyan Cephas">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+  <canvas id="gl"></canvas>
+
+  <!-- heads-up display, built by js/ui.js -->
+  <div id="hud"></div>
+
+  <div id="flash"></div>
+  <div id="splitLine"></div>
+  <div id="vsCard"></div>
+
+  <!-- ======================= touch controls ======================= -->
+  <div id="touch">
+    <div id="tStick">
+      <div id="tKnob"></div>
+    </div>
+
+    <div id="tLeftCol">
+      <button class="tbtn sm" data-act="up">▲</button>
+      <button class="tbtn sm" data-act="down">▼</button>
+      <button class="tbtn sm" data-act="boost">DASH</button>
+    </div>
+
+    <div id="tSpecials">
+      <button class="tbtn" data-act="s1">SP 1</button>
+      <button class="tbtn" data-act="s2">SP 2</button>
+      <button class="tbtn" data-act="s3">SP 3</button>
+      <button class="tbtn" data-act="s4">SP 4</button>
+      <button class="tbtn ult" data-act="ult">ULT</button>
+      <button class="tbtn" data-act="transform">⚡ FORM</button>
+    </div>
+
+    <div id="tRight">
+      <button class="tbtn big atk" data-act="attack" style="right:0;bottom:16%">PUNCH</button>
+      <button class="tbtn mid ki" data-act="ki" style="right:34%;bottom:44%">KI</button>
+      <button class="tbtn mid grd" data-act="guard" style="right:2%;bottom:56%">GUARD</button>
+      <button class="tbtn sm" data-act="heavy" style="right:62%;bottom:18%">SMASH</button>
+      <button class="tbtn sm" data-act="charge" style="right:60%;bottom:52%">CHARGE</button>
+      <button class="tbtn sm" data-act="pause" style="right:6%;bottom:88%">❚❚</button>
+    </div>
+  </div>
+
+  <!-- ============================ menus ============================ -->
+  <div id="overlay"></div>
+
+  <!-- ========================= boot screen ========================= -->
+  <div id="boot">
+    <div class="orb"></div>
+    <div id="bootText">Waking the Dragon Balls</div>
+    <div id="bootBar"><i></i></div>
+  </div>
+
+  <div id="rotate">
+    <div>
+      <div class="ic">📱</div>
+      <p>Turn your phone sideways to fight.</p>
+    </div>
+  </div>
+
+  <script src="js/three.min.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/roster.js"></script>
+  <script src="js/fx.js"></script>
+  <script src="js/build.js"></script>
+  <script src="js/fighter.js"></script>
+  <script src="js/moves.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/arena.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
+</body>
+
+</html>

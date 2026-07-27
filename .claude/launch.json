@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "saiyan-cephas",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["tools/serve.py", "8947", "--quiet"],
+      "port": 8947
+    }
+  ]
+}

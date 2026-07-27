@@ -77,7 +77,11 @@
   };
 
   G.resize = function () {
-    var w = window.innerWidth, h = window.innerHeight;
+    /* A hidden tab, or a phone mid-rotation, can report a zero-sized window.
+       Dividing by that gives the camera a NaN aspect and nothing ever draws
+       again, because resize only runs on the next resize event. */
+    var w = Math.max(1, window.innerWidth || 0);
+    var h = Math.max(1, window.innerHeight || 0);
     var S = C.S;
     var pr = Math.min(window.devicePixelRatio || 1,
       S.quality === 'low' ? 1 : (S.quality === 'medium' ? 1.5 : 2));
@@ -537,17 +541,22 @@
     var behind;
     var wantDist;
 
+    var dy = 0;
     if (t && t.alive) {
       var sep = f.pos.distanceTo(t.pos);
+      dy = (t.pos.y + t.chestOff) - (f.pos.y + f.chestOff);
       focus.lerp(t.chest(_v3), M.clamp(0.26 + sep * 0.005, 0.26, 0.40));
       behind = _v2.copy(f.pos).sub(t.pos);
       behind.y = 0;
       if (behind.lengthSq() < 1e-4) behind.set(0, 0, 1);
       behind.normalize();
-      wantDist = M.clamp(8.0 + sep * 0.38, 8.0, 21) * S.camDist;
+      /* Both fighters fly, so the gap is often mostly vertical. Distance has
+         to grow with that gap specifically — the horizontal term alone leaves
+         one of them off the top of the screen and the other off the bottom. */
+      wantDist = M.clamp(8.0 + sep * 0.30 + Math.abs(dy) * 0.42, 8.0, 34) * S.camDist;
       /* pull back and widen for big moves */
-      if (f.state === 'ult' || (t && t.state === 'ult')) wantDist *= 1.35;
-      else if (f.state === 'beam' || f.state === 'special') wantDist *= 1.12;
+      if (f.state === 'ult' || (t && t.state === 'ult')) wantDist *= 1.30;
+      else if (f.state === 'beam' || f.state === 'special') wantDist *= 1.10;
     } else {
       behind = _v2.set(-Math.sin(f.yaw), 0, -Math.cos(f.yaw));
       wantDist = 12 * S.camDist;
@@ -555,18 +564,20 @@
 
     cam.dist = M.damp(cam.dist, wantDist, 3.4, dt);
     var yaw = Math.atan2(behind.x, behind.z) + cam.yawOff;
-    var pitch = 0.17 + cam.pitchOff;
-    if (t && t.alive) {
-      /* tilt so a flying opponent stays framed */
-      var dy = (t.pos.y + t.chestOff) - (f.pos.y + f.chestOff);
-      pitch += M.clamp(dy * 0.010, -0.28, 0.34);
-    }
+    /* Positive pitch lifts the camera above the focus, which makes it look
+       DOWN. An opponent high overhead therefore needs pitch to go negative. */
+    var pitch = 0.17 + cam.pitchOff - M.clamp(dy * 0.011, -0.30, 0.38);
 
+    /* Anchor the camera behind the *fighter*, not behind the focus point.
+       The focus sits partway toward the opponent, so anchoring to it walks
+       the camera forward as the two separate and eventually leaves the
+       player behind the near plane. Anchor to the player, aim at the focus. */
     var cd = Math.cos(pitch) * cam.dist;
+    var anchor = f.chest(C.tmp.v3);
     var want = _v3.set(
-      focus.x + Math.sin(yaw) * cd,
-      focus.y + Math.sin(pitch) * cam.dist + 1.35,
-      focus.z + Math.cos(yaw) * cd);
+      anchor.x + Math.sin(yaw) * cd,
+      anchor.y + Math.sin(pitch) * cam.dist + 1.1,
+      anchor.z + Math.cos(yaw) * cd);
 
     /* never let the camera sink into the ground */
     if (G.arena) {

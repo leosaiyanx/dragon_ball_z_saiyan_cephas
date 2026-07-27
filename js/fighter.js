@@ -494,6 +494,10 @@
     this.model.scale.setScalar((f.h || 1));
     this.refreshAura();
     this.transformFlash = 0.9;
+    /* Nobody gets punched out of a transformation. It costs ki and a beat of
+       animation; taking a full combo on top of that just teaches players to
+       never press the most exciting button in the game. */
+    this.invuln = Math.max(this.invuln, 1.0);
     this.kiDrain = f.kiDrain;
     C.bus.emit('transform', { fighter: this, form: f });
     return true;

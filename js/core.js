@@ -258,7 +258,7 @@ var DBZ = (function () {
   C.DIFFICULTY = {
     rookie: {
       id: 'rookie', name: 'Rookie', kanji: '弱', color: '#5fd97a', rank: 0,
-      aggro: 0.32, react: 0.62, skill: 0.22, dmgIn: 0.40, dmgOut: 1.45,
+      aggro: 0.30, react: 0.65, skill: 0.20, dmgIn: 0.30, dmgOut: 1.55,
       kiRegen: 0.7, comboLen: 2, vanish: 0.05, guard: 0.25,
       blurb: 'Gentle sparring partners. Great for learning the moves.'
     },

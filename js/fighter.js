@@ -15,11 +15,19 @@
   var AURA_VERT = [
     'varying vec2 vUv; varying float vRim;',
     'uniform float uTime; uniform float uWob;',
+    'float h1(float n){ return fract(sin(n) * 43758.5453); }',
     'void main(){',
     '  vUv = uv;',
     '  vec3 p = position;',
-    '  float w = sin(uTime * 9.0 + p.y * 6.0 + p.x * 3.0) * 0.5 + sin(uTime * 13.0 + p.z * 5.0) * 0.5;',
-    '  p.xz *= 1.0 + w * uWob * (0.25 + uv.y * 0.9);',
+    /* Ragged the silhouette on purpose. A smooth cone always reads as a cone
+       no matter how it is shaded; breaking the outer edge with noise is what
+       turns it into a column of fire. */
+    '  float band = floor(uv.x * 13.0);',
+    '  float rough = h1(band * 12.9898 + floor(uTime * 7.0) * 3.71) * 0.6',
+    '               + h1(band * 4.1 + floor(uTime * 11.0) * 1.37) * 0.4;',
+    '  float w = sin(uTime * 9.0 + p.y * 6.0 + p.x * 3.0) * 0.4',
+    '          + sin(uTime * 13.0 + p.z * 5.0) * 0.3 + (rough - 0.5) * 1.6;',
+    '  p.xz *= 1.0 + w * uWob * (0.22 + uv.y * 1.15);',
     '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
     /* rim term: the shell is transparent face-on and bright at the silhouette,
        which is what stops it reading as a solid cone */
@@ -45,12 +53,18 @@
     '  vec2 q = vec2(vUv.x * uTongues, vUv.y * 2.2 - uTime * 2.4);',
     '  float n = vnoise(q) * 0.6 + vnoise(q * 2.3 + 11.0) * 0.4;',
     /* flames thin out toward the tip; the noise eats into them as they rise */
-    '  float body = smoothstep(0.0, 0.06, vUv.y) * pow(1.0 - vUv.y, 1.5);',
-    '  float tongue = smoothstep(0.46, 0.92, n + (1.0 - vUv.y) * 0.55);',
-    '  float rim = pow(clamp(vRim, 0.0, 1.0), 2.2);',
-    '  float a = clamp(rim * body * 1.15 + tongue * body * 1.45, 0.0, 1.0) * uIntensity;',
+    /* The base of the cone has to fade out too. Leaving it solid draws a
+       bright ring round the fighter's feet, which is what makes an aura read
+       as a glass lampshade instead of fire. */
+    '  float body = smoothstep(0.02, 0.26, vUv.y) * pow(1.0 - vUv.y, 1.25);',
+    '  float tongue = smoothstep(0.47, 0.86, n + (1.0 - vUv.y) * 0.42);',
+    '  float rim = pow(clamp(vRim, 0.0, 1.0), 2.6);',
+    /* Alpha is capped below 1 on purpose. Additive blending plus an
+       uncapped intensity turns a full-power aura into an opaque white cone
+       with the fighter hidden inside it. */
+    '  float a = clamp((rim * body * 0.14 + tongue * body * 2.25) * uIntensity, 0.0, 0.82);',
     '  vec3 col = mix(uColor, uCore, smoothstep(0.25, 0.9, n) * (1.0 - vUv.y * 0.5));',
-    '  gl_FragColor = vec4(col * (0.75 + n * 1.7), a);',
+    '  gl_FragColor = vec4(col * (0.55 + n * 1.15), a);',
     '}'
   ].join('\n');
 
@@ -62,7 +76,7 @@
       uniforms: {
         uTime: { value: 0 }, uColor: { value: new THREE.Color(0x59c8ff) },
         uCore: { value: new THREE.Color(0xffffff) }, uIntensity: { value: 0 },
-        uWob: { value: 0.10 }, uTongues: { value: 7 }
+        uWob: { value: 0.30 }, uTongues: { value: 13 }
       },
       transparent: true, depthWrite: false, side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending
@@ -107,8 +121,8 @@
     this.model.add(this.aura);
     this.auraCore = makeAura(this.height * 0.86, this.P.shoulderW * 1.45);
     this.auraCore.position.y = -this.height * 0.03;
-    this.auraCore.material.uniforms.uTongues.value = 4;
-    this.auraCore.material.uniforms.uWob.value = 0.05;
+    this.auraCore.material.uniforms.uTongues.value = 7;
+    this.auraCore.material.uniforms.uWob.value = 0.18;
     this.model.add(this.auraCore);
 
     /* ---- transform state ---- */
@@ -822,19 +836,21 @@
     /* Non-linear so a resting fighter's aura all but disappears. A linear
        ramp left a faintly lit cone around everyone at all times, which read
        as a glass lampshade rather than as ki. */
-    var lv = Math.pow(Math.max(0, this.auraLevel), 1.7);
+    var lv = Math.min(1.55, Math.pow(Math.max(0, this.auraLevel), 1.7));
     var show = this.auraLevel > 0.20;
     this.aura.visible = show;
     this.auraCore.visible = show;
-    u.uIntensity.value = lv * 0.70;
-    u2.uIntensity.value = lv * 0.58;
+    u.uIntensity.value = lv * 0.20;
+    u2.uIntensity.value = lv * 0.26;
     var s = 1 + this.auraLevel * 0.10;
     this.aura.scale.set(s, 1 + this.auraLevel * 0.20, s);
 
     /* flame particles + lightning for the higher forms */
     if (this.auraLevel > 0.25 && this.alive) {
-      FX.auraFlames(this.pos.x, this.pos.y + this.chestOff * 0.8, this.pos.z,
-        this.auraColor, this.height * 0.42, Math.min(2, this.auraLevel), dt);
+      /* Particles, not the shell, are what the aura actually is — the mesh
+         is a cone and will always read as one, however it is shaded. */
+      FX.auraFlames(this.pos.x, this.pos.y + this.chestOff * 0.72, this.pos.z,
+        this.auraColor, this.height * 0.50, Math.min(2.6, this.auraLevel * 1.9), dt);
       var f = this.form();
       var sparks = f ? (f.sparks || 0) : 0;
       if (this.state === 'charge') sparks += 0.8;

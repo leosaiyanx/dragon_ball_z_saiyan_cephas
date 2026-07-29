@@ -13,31 +13,181 @@
   var B = {};
   C.Build = B;
 
-  /* ------------------------------------------------------------ materials */
+  /* ============================== cel shading ============================
+     Anime does not shade with a smooth gradient — it fills a flat base
+     colour and drops one hard-edged shadow shape over it. MeshToonMaterial
+     with a stepped gradient map gives exactly that, and unlike a bespoke
+     shader it still gets three.js lighting, fog and shadow maps for free. */
+  var gradientTex = null;
+  function toonGradient() {
+    if (gradientTex) return gradientTex;
+    /* three bands: core shadow, mid, lit. The jump from 0.42 to 0.86 is what
+       makes the terminator a line instead of a fade. */
+    var steps = [110, 178, 255];
+    var data = new Uint8Array(steps.length * 4);
+    for (var i = 0; i < steps.length; i++) {
+      data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = steps[i];
+      data[i * 4 + 3] = 255;
+    }
+    gradientTex = new THREE.DataTexture(data, steps.length, 1, THREE.RGBAFormat);
+    gradientTex.minFilter = gradientTex.magFilter = THREE.NearestFilter;
+    gradientTex.generateMipmaps = false;
+    gradientTex.needsUpdate = true;
+    return gradientTex;
+  }
+  B.toonGradient = toonGradient;
+
+  /* Terrain wants more steps than a character: three hard bands across a
+     whole hillside stripes the horizon, five reads as painted ground. */
+  var softTex = null;
+  function toonGradientSoft() {
+    if (softTex) return softTex;
+    var steps = [126, 162, 196, 226, 255];
+    var data = new Uint8Array(steps.length * 4);
+    for (var i = 0; i < steps.length; i++) {
+      data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = steps[i];
+      data[i * 4 + 3] = 255;
+    }
+    softTex = new THREE.DataTexture(data, steps.length, 1, THREE.RGBAFormat);
+    softTex.minFilter = softTex.magFilter = THREE.NearestFilter;
+    softTex.generateMipmaps = false;
+    softTex.needsUpdate = true;
+    return softTex;
+  }
+  B.toonGradientSoft = toonGradientSoft;
+
+  /* Toon shading alone still leaves a figure looking flat against a bright
+     sky, so every surface also gets a rim term injected into the shader —
+     the bounce light anime uses to separate a character from the
+     background. It is a two-line patch rather than a whole custom material. */
+  function addRim(m, strength) {
+    var k = strength === undefined ? 0.42 : strength;
+    m.onBeforeCompile = function (sh) {
+      sh.uniforms.uRim = { value: k };
+      /* `vNormal` only exists when the material is smooth-shaded, so the
+         normal is grabbed from normal_fragment_begin instead — that local
+         is defined for flat and smooth alike. */
+      sh.fragmentShader = sh.fragmentShader
+        .replace('void main() {',
+          'uniform float uRim;\nvec3 gRimN;\nvoid main() {')
+        .replace('#include <normal_fragment_begin>',
+          '#include <normal_fragment_begin>\n  gRimN = normal;')
+        .replace('#include <dithering_fragment>',
+          '#include <dithering_fragment>\n' +
+          '  float rimT = 1.0 - abs(dot(normalize(gRimN), normalize(vViewPosition)));\n' +
+          '  gl_FragColor.rgb += pow(clamp(rimT, 0.0, 1.0), 3.0) * uRim * diffuseColor.rgb;');
+    };
+    m.customProgramCacheKey = function () { return 'rim' + k; };
+    return m;
+  }
+
   var matCache = {};
   function mat(hex, opts) {
     var key = hex + '|' + (opts ? JSON.stringify(opts) : '');
     var m = matCache[key];
     if (m) return m;
-    m = new THREE.MeshLambertMaterial(Object.assign({ color: hex }, opts || {}));
+    m = makeToon(hex, opts);
     matCache[key] = m;
     return m;
   }
   B.mat = mat;
 
+  function makeToon(hex, opts) {
+    var o = Object.assign({ color: hex, gradientMap: toonGradient() }, opts || {});
+    return addRim(new THREE.MeshToonMaterial(o));
+  }
+
   /* Skin, hair and outfit materials are cloned per fighter so a
      transformation can tint one body without touching everyone else.  */
   function ownMat(hex, opts) {
-    return new THREE.MeshLambertMaterial(Object.assign({ color: hex }, opts || {}));
+    return makeToon(hex, opts);
   }
   B.ownMat = ownMat;
 
   function glowMat(hex, boost) {
     var m = new THREE.MeshBasicMaterial({ color: hex, toneMapped: false });
     m.color.multiplyScalar(boost === undefined ? 2.2 : boost);
+    m.userData.glow = true;
     return m;
   }
   B.glowMat = glowMat;
+
+  /* ================================ outlines =============================
+     Classic inverted hull: the same shape re-drawn backface-only and pushed
+     out along its normals. The offset is scaled by view depth so the ink
+     line stays the same thickness on screen whether the fighter is in your
+     face or across the arena. */
+  var OUTLINE_VERT = [
+    'uniform float uWidth;',
+    'void main(){',
+    '  vec3 n = normalize(normalMatrix * normal);',
+    '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+    '  mv.xyz += n * uWidth * max(0.6, -mv.z);',
+    '  gl_Position = projectionMatrix * mv;',
+    '}'
+  ].join('\n');
+
+  var OUTLINE_FRAG = [
+    'uniform vec3 uColor;',
+    'void main(){ gl_FragColor = vec4(uColor, 1.0); }'
+  ].join('\n');
+
+  B.outlineMaterial = function (width, color) {
+    return new THREE.ShaderMaterial({
+      vertexShader: OUTLINE_VERT, fragmentShader: OUTLINE_FRAG,
+      uniforms: {
+        uWidth: { value: width === undefined ? 0.0080 : width },
+        uColor: { value: new THREE.Color(color === undefined ? 0x0a0a12 : color) }
+      },
+      side: THREE.BackSide, depthWrite: true, depthTest: true, fog: false
+    });
+  };
+
+  /* Every mesh hanging off one joint shares that joint's transform, so they
+     can be baked into a single outline mesh. That turns ~130 extra draw
+     calls per fighter into ~18, which is the difference between outlines
+     being affordable on a phone and not. */
+  function mergeJointOutline(joint, material) {
+    var pos = [], nrm = [], idx = [], base = 0;
+    var mtx = new THREE.Matrix4(), nm = new THREE.Matrix3();
+    var v = new THREE.Vector3();
+    for (var c = 0; c < joint.children.length; c++) {
+      var o = joint.children[c];
+      if (!o.isMesh || o.userData.noOutline) continue;
+      if (o.material && (o.material.userData.glow || o.material.transparent ||
+        o.material.side === THREE.DoubleSide)) continue;
+      var g = o.geometry;
+      if (!g || !g.attributes.position || !g.attributes.normal) continue;
+      o.updateMatrix();
+      mtx.copy(o.matrix);
+      nm.getNormalMatrix(mtx);
+      var p = g.attributes.position, n = g.attributes.normal;
+      for (var i = 0; i < p.count; i++) {
+        v.fromBufferAttribute(p, i).applyMatrix4(mtx);
+        pos.push(v.x, v.y, v.z);
+        v.fromBufferAttribute(n, i).applyMatrix3(nm).normalize();
+        nrm.push(v.x, v.y, v.z);
+      }
+      if (g.index) {
+        var ia = g.index.array;
+        for (var k = 0; k < ia.length; k++) idx.push(ia[k] + base);
+      } else {
+        for (var k2 = 0; k2 < p.count; k2++) idx.push(k2 + base);
+      }
+      base += p.count;
+    }
+    if (!pos.length) return null;
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setIndex(idx);
+    var mesh = new THREE.Mesh(geo, material);
+    mesh.userData.isOutline = true;
+    mesh.renderOrder = -1;
+    joint.add(mesh);
+    return mesh;
+  }
+  B.mergeJointOutline = mergeJointOutline;
 
   /* ------------------------------------------------------- geometry cache */
   var geoCache = {};
@@ -241,25 +391,49 @@
     var dark = ownMat(0x14141c);
     out.irisMats.push(iris);
 
-    /* Big anime eyes. They read at any distance and carry the whole face. */
-    var ex = hr * 0.38, ey = hr * 0.04, ez = hr * 0.80;
-    var sw = ellip(head, eyeWhite, hr * 0.30, hr * 0.27, hr * 0.20, -ex, ey, ez);
-    var se = ellip(head, eyeWhite, hr * 0.30, hr * 0.27, hr * 0.20, ex, ey, ez);
+    /* Big anime eyes, built in layers: a dark socket that peeks out as the
+       ink line round the lid, the white, a tall iris and a highlight. That
+       stack is what separates an anime eye from two dots on a ball. */
+    var ex = hr * 0.38, ey = hr * 0.05, ez = hr * 0.78;
+    var socket = [
+      ellip(head, dark, hr * 0.34, hr * 0.31, hr * 0.15, -ex, ey, ez - hr * 0.02),
+      ellip(head, dark, hr * 0.34, hr * 0.31, hr * 0.15, ex, ey, ez - hr * 0.02)
+    ];
+    socket[0].rotation.z = 0.16; socket[1].rotation.z = -0.16;
+    var sw = ellip(head, eyeWhite, hr * 0.29, hr * 0.26, hr * 0.23, -ex, ey, ez + hr * 0.07);
+    var se = ellip(head, eyeWhite, hr * 0.29, hr * 0.26, hr * 0.23, ex, ey, ez + hr * 0.07);
+    sw.rotation.z = 0.16; se.rotation.z = -0.16;
+    sw.userData.noOutline = true; se.userData.noOutline = true;
+    socket[0].userData.noOutline = true; socket[1].userData.noOutline = true;
     out.eyeWhites = [sw, se];
     out.pupils = [
-      ellip(head, iris, hr * 0.16, hr * 0.22, hr * 0.13, -ex, ey, ez + hr * 0.14),
-      ellip(head, iris, hr * 0.16, hr * 0.22, hr * 0.13, ex, ey, ez + hr * 0.14)
+      ellip(head, iris, hr * 0.14, hr * 0.22, hr * 0.15, -ex, ey, ez + hr * 0.21),
+      ellip(head, iris, hr * 0.14, hr * 0.22, hr * 0.15, ex, ey, ez + hr * 0.21)
     ];
+    /* pupil core and catchlight */
+    ellip(head, dark, hr * 0.08, hr * 0.14, hr * 0.10, -ex, ey - hr * 0.01, ez + hr * 0.26)
+      .userData.noOutline = true;
+    ellip(head, dark, hr * 0.08, hr * 0.14, hr * 0.10, ex, ey - hr * 0.01, ez + hr * 0.26)
+      .userData.noOutline = true;
+    var shine = ownMat(0xffffff);
+    ellip(head, shine, hr * 0.055, hr * 0.065, hr * 0.05,
+      -ex + hr * 0.08, ey + hr * 0.11, ez + hr * 0.28).userData.noOutline = true;
+    ellip(head, shine, hr * 0.055, hr * 0.065, hr * 0.05,
+      ex + hr * 0.08, ey + hr * 0.11, ez + hr * 0.28).userData.noOutline = true;
 
     /* angry anime brows — the single strongest read on a low-poly face */
-    var bl = plate(head, dark, hr * 0.44, hr * 0.10, hr * 0.12, -ex, hr * 0.40, ez + hr * 0.06);
-    var br = plate(head, dark, hr * 0.44, hr * 0.10, hr * 0.12, ex, hr * 0.40, ez + hr * 0.06);
-    bl.rotation.z = -0.34; br.rotation.z = 0.34;
+    var bl = plate(head, dark, hr * 0.46, hr * 0.11, hr * 0.13, -ex, hr * 0.44, ez + hr * 0.08);
+    var br = plate(head, dark, hr * 0.46, hr * 0.11, hr * 0.13, ex, hr * 0.44, ez + hr * 0.08);
+    bl.rotation.z = -0.40; br.rotation.z = 0.40;
+    bl.userData.noOutline = true; br.userData.noOutline = true;
+    out.pupils[0].userData.noOutline = true;
+    out.pupils[1].userData.noOutline = true;
     out.brows = [bl, br];
     if (spec.head && spec.head.noBrow) { bl.visible = br.visible = false; }
 
     /* mouth — a thin dark slab that opens for shouts */
     var mouth = plate(head, dark, hr * 0.30, hr * 0.055, hr * 0.10, 0, -hr * 0.46, hr * 0.80);
+    mouth.userData.noOutline = true;
     out.mouth = mouth;
 
     /* nose hint */
@@ -637,9 +811,8 @@
     function cape(material) {
       var g = new THREE.CylinderGeometry(1, 1.35, 1, 14, 9, true,
         Math.PI * 0.42, Math.PI * 1.16);
-      var cp = new THREE.Mesh(g, new THREE.MeshLambertMaterial({
-        color: material, side: THREE.DoubleSide, flatShading: false
-      }));
+      var cp = new THREE.Mesh(g, makeToon(material, { side: THREE.DoubleSide }));
+      cp.userData.noOutline = true;
       cp.scale.set(W * 1.12, H * 0.50, W * 0.95);
       cp.position.set(0, torsoTop * 0.52 - H * 0.25, 0);
       rig.torso.add(cp);
@@ -1130,14 +1303,47 @@
     buildOutfit(rig, spec, P, out);
     if (spec.tail) buildTail(rig, spec, P, out, spec.fit && spec.fit.fur ? spec.fit.fur : null);
 
-    /* shadows only on the chunky bits — cheap and looks the same */
     group.traverse(function (o) {
       if (o.isMesh) { o.castShadow = !!opts.shadows; o.receiveShadow = false; o.matrixAutoUpdate = true; }
     });
 
+    /* --- ink outlines --------------------------------------------------
+       One baked outline mesh per joint. Anything transparent, additive or
+       double-sided is skipped: an inverted hull round a translucent sheet
+       reads as a black smear rather than a line. */
+    if (opts.outline !== false) {
+      out.outlineMat = B.outlineMaterial(opts.outlineWidth || 0.0080);
+      out.outlines = [];
+      var joints = [rig.hips, rig.torso, rig.chest, rig.head, rig.headInner,
+      rig.armL, rig.foreL, rig.handL, rig.armR, rig.foreR, rig.handR,
+      rig.legL, rig.shinL, rig.footL, rig.legR, rig.shinR, rig.footR];
+      for (var ji = 0; ji < joints.length; ji++) {
+        if (!joints[ji]) continue;
+        var om = mergeJointOutline(joints[ji], out.outlineMat);
+        if (om) out.outlines.push(om);
+      }
+    }
+
     out.group = group;
     out.height = H;
     return out;
+  };
+
+  /* Outlines are baked from the mesh layout, so a transformation that swaps
+     the hair has to rebuild the head's line art or it keeps the old spikes. */
+  B.rebuildOutline = function (built, joint) {
+    if (!built.outlineMat || !joint) return;
+    for (var i = joint.children.length - 1; i >= 0; i--) {
+      var c = joint.children[i];
+      if (c.userData && c.userData.isOutline) {
+        joint.remove(c);
+        if (c.geometry) c.geometry.dispose();
+        var k = built.outlines.indexOf(c);
+        if (k >= 0) built.outlines.splice(k, 1);
+      }
+    }
+    var om = mergeJointOutline(joint, built.outlineMat);
+    if (om) built.outlines.push(om);
   };
 
   /* --------------------------------------------------------- retinting ---
@@ -1165,6 +1371,7 @@
     built.hairMats.length = 0;
     built.maneStrands.length = 0;
     buildHair(built.rig.headInner, hairSpec, built.P.headR, built);
+    B.rebuildOutline(built, built.rig.headInner);
   };
 
 })(DBZ);

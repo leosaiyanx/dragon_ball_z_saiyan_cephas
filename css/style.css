@@ -693,9 +693,46 @@ h3 {
   animation: scrfade 0.25s ease-out;
 }
 
+#scr-title.on {
+  overflow-y: auto;
+}
+
 .screen.clear {
   background: linear-gradient(180deg, rgba(3, 5, 12, 0.55), rgba(3, 5, 12, 0.8));
   backdrop-filter: blur(2px);
+}
+
+/* The title screen wants the live 3D fighter to be the hero, so the veil is
+   heavy behind the menu column and clears away to nothing over the model.
+   A full-screen blur here is what used to leave Goku a dim smudge. */
+.screen.hero {
+  background: linear-gradient(96deg,
+      rgba(4, 6, 14, 0.96) 0%,
+      rgba(4, 6, 14, 0.93) 34%,
+      rgba(6, 9, 20, 0.55) 54%,
+      rgba(6, 9, 20, 0.10) 74%,
+      rgba(6, 9, 20, 0.00) 100%);
+  backdrop-filter: none;
+}
+
+@media (max-aspect-ratio: 1/1) {
+  .screen.hero {
+    background: linear-gradient(180deg,
+        rgba(4, 6, 14, 0.94) 0%,
+        rgba(4, 6, 14, 0.86) 52%,
+        rgba(6, 9, 20, 0.55) 100%);
+  }
+}
+
+/* ------------------------------ menu focus ------------------------------- */
+/* Keyboard and gamepad users get a visible cursor. Mouse users never see it
+   because pointer input clears the focus ring. */
+.navcur {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--gold), 0 0 26px rgba(255, 201, 58, 0.55) !important;
+  border-color: var(--gold) !important;
+  position: relative;
+  z-index: 2;
 }
 
 @keyframes scrfade {
@@ -755,9 +792,59 @@ h3 {
 
 /* ------------------------------- title ---------------------------------- */
 #scr-title {
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  text-align: center;
+}
+
+.titleWrap {
+  margin: auto 0 auto clamp(1.2em, 5vw, 4.5em);
+  text-align: left;
+  width: min(26em, 46vw);
+  padding: 1em 0;
+  /* the column, not the viewport, sets the type scale — otherwise the logo
+     grows past the panel on a wide screen and clips at the top */
+  container-type: inline-size;
+}
+
+#scr-title .logo .l1 {
+  font-size: clamp(0.95em, 3.0vw, 1.8em);
+  letter-spacing: 0.16em;
+}
+
+#scr-title .logo .l2 {
+  font-size: clamp(1.7em, 5.4vw, 3.4em);
+  line-height: 0.98;
+}
+
+#scr-title .logo .l3 {
+  font-size: clamp(0.6em, 1.35vw, 0.9em);
+  letter-spacing: 0.30em;
+  margin-top: 0.35em;
+}
+
+#scr-title .forCephas {
+  font-size: clamp(0.7em, 1.5vw, 0.92em);
+  margin-top: 0.35em;
+}
+
+#scr-title .titleMenu {
+  margin-top: clamp(0.8em, 2.6vh, 1.5em);
+  width: 100%;
+  gap: 0.45em;
+}
+
+#scr-title .btn.wide {
+  min-height: 3.0em;
+  padding: 0.72em 1.1em;
+  font-size: 1em;
+}
+
+@media (max-aspect-ratio: 1/1) {
+  .titleWrap {
+    margin: auto;
+    text-align: center;
+    width: min(32em, 92vw);
+  }
 }
 
 .logo {
@@ -884,8 +971,15 @@ h3 {
 
 .btn.wide {
   width: 100%;
-  font-size: 1.05em;
-  padding: 0.85em 1.2em;
+  font-size: 1.08em;
+  padding: 0.95em 1.25em;
+  min-height: 3.4em;
+}
+
+.btn.wide .ico {
+  font-size: 1.6em;
+  width: 1.4em;
+  text-align: center;
 }
 
 .btn .ico {
@@ -979,10 +1073,44 @@ h3 {
   inset: 0;
 }
 
-.cha .art canvas {
+.cha .art canvas,
+.cha .art img {
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: cover;
+}
+
+.cha .art img.shot {
+  opacity: 0;
+  transition: opacity 0.22s ease-out;
+}
+
+.cha .art img.shot.in {
+  opacity: 1;
+}
+
+.bigshot {
+  width: 100%;
+  max-width: 190px;
+  aspect-ratio: 232/300;
+  margin: 0 auto;
+  border-radius: 0.6em;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  position: relative;
+}
+
+.bigshot img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.25s ease-out;
+}
+
+.bigshot img.in {
+  opacity: 1;
 }
 
 .cha .nm {

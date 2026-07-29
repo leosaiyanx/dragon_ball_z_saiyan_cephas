@@ -315,6 +315,130 @@
   }
   U.shade = shade;
 
+  /* ============================ menu navigation ==========================
+     Arrow keys, WASD and a gamepad all drive the menus. Without this a kid
+     with a controller has to put it down and reach for the mouse every time
+     the game leaves a fight, which is the single most annoying thing a
+     console-style game can do. Movement is geometric — nearest item in the
+     direction you pushed — so it works on button columns and on the 79-tile
+     roster grid without either needing to know about the other. */
+  var nav = { items: [], idx: -1, active: false };
+  U.nav = nav;
+
+  var NAV_SEL = '.btn, .saga, .fight, .chip, .cha, .seg button, .scr-foot button';
+
+  function navCollect() {
+    var scr = U.current && U.screens[U.current];
+    nav.items = [];
+    if (!scr) return;
+    var list = scr.querySelectorAll(NAV_SEL);
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (e.disabled) continue;
+      var r = e.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) continue;
+      nav.items.push(e);
+    }
+  }
+
+  function navPaint() {
+    for (var i = 0; i < nav.items.length; i++) nav.items[i].classList.remove('navcur');
+    var cur = nav.items[nav.idx];
+    if (!cur) return;
+    cur.classList.add('navcur');
+    if (cur.scrollIntoView) {
+      cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }
+
+  U.navClear = function () {
+    for (var i = 0; i < nav.items.length; i++) nav.items[i].classList.remove('navcur');
+    nav.idx = -1;
+    nav.active = false;
+  };
+
+  /* Pick the item whose centre is nearest along `dir`, penalising sideways
+     drift so a column of buttons steps cleanly and a grid moves row by row. */
+  function navMove(dx, dy) {
+    navCollect();
+    if (!nav.items.length) return;
+    if (nav.idx < 0 || !nav.items[nav.idx]) { nav.idx = 0; nav.active = true; navPaint(); return; }
+    var from = nav.items[nav.idx].getBoundingClientRect();
+    var fx = from.left + from.width / 2, fy = from.top + from.height / 2;
+    var best = -1, bestScore = 1e9;
+    for (var i = 0; i < nav.items.length; i++) {
+      if (i === nav.idx) continue;
+      var r = nav.items[i].getBoundingClientRect();
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      var along = (cx - fx) * dx + (cy - fy) * dy;
+      if (along <= 2) continue;
+      var side = Math.abs((cx - fx) * dy - (cy - fy) * dx);
+      var score = along + side * 2.6;
+      if (score < bestScore) { bestScore = score; best = i; }
+    }
+    if (best >= 0) { nav.idx = best; nav.active = true; navPaint(); }
+  }
+
+  function navActivate() {
+    var cur = nav.items[nav.idx];
+    if (!cur) { navMove(0, 1); return; }
+    cur.click();
+  }
+
+  /* Back / cancel: use the screen's own back button if it has one. */
+  function navBack() {
+    var scr = U.current && U.screens[U.current];
+    if (!scr) return false;
+    var b = scr.querySelector('.scr-head .btn.ghost');
+    if (b) { b.click(); return true; }
+    var foot = scr.querySelectorAll('.scr-foot .btn.ghost');
+    if (foot.length) { foot[foot.length - 1].click(); return true; }
+    return false;
+  }
+  U.navBack = navBack;
+
+  U.navKey = function (code) {
+    if (!U.current) return false;
+    switch (code) {
+      case 'ArrowUp': case 'KeyW': navMove(0, -1); return true;
+      case 'ArrowDown': case 'KeyS': navMove(0, 1); return true;
+      case 'ArrowLeft': case 'KeyA': navMove(-1, 0); return true;
+      case 'ArrowRight': case 'KeyD': navMove(1, 0); return true;
+      case 'Enter': case 'Space': case 'NumpadEnter':
+        if (nav.active) { navActivate(); return true; }
+        navMove(0, 1); return true;
+      case 'Backspace': case 'Escape': return navBack();
+    }
+    return false;
+  };
+
+  /* Gamepad: stick and d-pad step the cursor, A confirms, B goes back. */
+  var padRepeat = 0;
+  U.navPad = function (dt) {
+    if (!U.current || !navigator.getGamepads) return;
+    var gps = navigator.getGamepads();
+    var gp = null;
+    for (var i = 0; i < gps.length; i++) { if (gps[i] && gps[i].connected) { gp = gps[i]; break; } }
+    if (!gp) return;
+    padRepeat -= dt;
+    var ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+    var up = (gp.buttons[12] && gp.buttons[12].pressed) || ay < -0.55;
+    var dn = (gp.buttons[13] && gp.buttons[13].pressed) || ay > 0.55;
+    var lf = (gp.buttons[14] && gp.buttons[14].pressed) || ax < -0.55;
+    var rt = (gp.buttons[15] && gp.buttons[15].pressed) || ax > 0.55;
+    if (up || dn || lf || rt) {
+      if (padRepeat <= 0) {
+        padRepeat = nav.active ? 0.17 : 0.30;
+        navMove(rt ? 1 : (lf ? -1 : 0), dn ? 1 : (up ? -1 : 0));
+      }
+    } else { padRepeat = 0; }
+    var a = gp.buttons[0] && gp.buttons[0].pressed;
+    var b = gp.buttons[1] && gp.buttons[1].pressed;
+    if (a && !U._padA) navActivate();
+    if (b && !U._padB) navBack();
+    U._padA = a; U._padB = b;
+  };
+
   /* ================================ screens ============================== */
   U.screens = {};
   U.stack = [];
@@ -332,12 +456,17 @@
   };
 
   U.show = function (id, opts) {
+    U.navClear();
     U.overlay.classList.add('show');
-    for (var k in U.screens) U.screens[k].classList.remove('on');
+    for (var k in U.screens) {
+      U.screens[k].classList.remove('on');
+      U.screens[k].classList.remove('hero');
+    }
     var s = U.screens[id];
     if (!s) return;
     s.classList.add('on');
     s.classList.toggle('clear', !!(opts && opts.clear));
+    s.classList.toggle('hero', !!(opts && opts.hero));
     U.current = id;
     s.scrollTop = 0;
     C.bus.emit('screen', { id: id });
@@ -377,8 +506,7 @@
     var s = U.screens.title;
     clear(s);
     s.classList.add('clear');
-    var wrap = el('div');
-    wrap.style.cssText = 'margin:auto;text-align:center;padding:1em;';
+    var wrap = el('div', 'titleWrap');
 
     var logo = el('div', 'logo');
     logo.appendChild(el('span', 'l1', 'DRAGON BALL Z'));
@@ -407,7 +535,7 @@
     });
     wrap.appendChild(menu);
     s.appendChild(wrap);
-    U.show('title', { clear: true });
+    U.show('title', { hero: true });
   };
 
   /* -------------------------------- modes --------------------------------- */
@@ -550,9 +678,16 @@
       var c = R.get(state.pick);
       clear(detail);
       var left = el('div');
-      var pc = U.portrait(c, 220);
-      pc.style.cssText = 'width:100%;max-width:150px;border-radius:0.5em;display:block;margin:0 auto;';
-      left.appendChild(pc);
+      var frame = el('div', 'bigshot');
+      frame.style.background = 'radial-gradient(circle at 50% 36%, ' +
+        shade(c.aura, 0.08) + ', ' + shade(c.aura, -0.66) + ' 64%, #070b18 100%)';
+      var big = el('img');
+      big.alt = c.name;
+      frame.appendChild(big);
+      left.appendChild(frame);
+      if (C.Portrait) {
+        C.Portrait.request(c, function (url) { big.src = url; big.classList.add('in'); });
+      }
       var fav = el('button', 'btn ghost', (C.load().favorites.indexOf(c.id) >= 0 ? '★ Favourite' : '☆ Add favourite'));
       fav.style.cssText = 'margin-top:0.5em;width:100%;font-size:0.82em;';
       on(fav, function () {
@@ -624,6 +759,39 @@
       if (G.previewCharacter) G.previewCharacter(c);
     }
 
+    /* Only tiles that are actually on screen ask for a render. Scrolling the
+       roster then costs nothing until you reach a card you can see. */
+    var io = null;
+    if (window.IntersectionObserver) {
+      io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          var t = en.target;
+          if (!en.isIntersecting) return;
+          io.unobserve(t);
+          var c = R.byId[t.dataset.cid];
+          var img = t.querySelector('img.shot');
+          if (c && img) fillShot(c, img);
+        });
+      }, { root: null, rootMargin: '320px 0px', threshold: 0.01 });
+    }
+
+    function fillShot(c, img) {
+      if (!C.Portrait) return;
+      C.Portrait.request(c, function (url) {
+        img.src = url;
+        img.classList.add('in');
+      });
+    }
+
+    function watchTile(tile, c, img) {
+      if (C.Portrait && C.Portrait.has(c.id)) {
+        img.src = C.Portrait.get(c.id);
+        img.classList.add('in');
+        return;
+      }
+      if (io) io.observe(tile); else fillShot(c, img);
+    }
+
     function renderGrid() {
       clear(grid);
       var list = state.era === 'fav'
@@ -636,11 +804,17 @@
       list.forEach(function (c) {
         var tile = el('div', 'cha' + (c.id === state.pick ? ' sel' : ''));
         var art = el('div', 'art');
-        var cv = U.portrait(c, 128);
-        var img = cv.cloneNode(true);
-        img.getContext('2d').drawImage(cv, 0, 0);
+        /* the ki colour fills the card until the real render arrives, so the
+           grid is never a wall of grey boxes */
+        art.style.background = 'radial-gradient(circle at 50% 38%, ' +
+          shade(c.aura, 0.05) + ', ' + shade(c.aura, -0.62) + ' 62%, #080c1a 100%)';
+        var img = el('img', 'shot');
+        img.alt = c.short;
+        img.decoding = 'async';
         art.appendChild(img);
         tile.appendChild(art);
+        tile.dataset.cid = c.id;
+        watchTile(tile, c, img);
         tile.appendChild(el('div', 'era', c.era));
         if (c.forms.length) tile.appendChild(el('div', 'forms', '+' + c.forms.length));
         tile.appendChild(el('div', 'nm', c.short));

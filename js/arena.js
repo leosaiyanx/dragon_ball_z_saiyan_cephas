@@ -73,7 +73,7 @@
     {
       id: 'wasteland', name: 'Rocky Wasteland', sub: 'Where it usually starts',
       kind: 'terrain', radius: 150, ceil: 105, seed: 7,
-      ground: 0xa08560, ground2: 0x6e5a40, dust: 0xbfa580,
+      ground: 0xc09a62, ground2: 0x6a4f31, dust: 0xd8b98a,
       sky: { top: 0x2f6ec8, mid: 0x8fc4ec, bot: 0xd8c9a8, sun: 0xffe9c0, sunSize: 300 },
       fog: 0x9fb6cf, fogD: 0.0022, hemi: 0x9fc8ff, hemiG: 0xa08560,
       rocks: 90, amp: 5.5, freq: 0.012
@@ -89,7 +89,7 @@
     {
       id: 'cellgames', name: 'Cell Games Arena', sub: 'Ten fighters, one ring',
       kind: 'ring', radius: 130, ceil: 100, seed: 33, ringR: 22, ringH: 1.2,
-      ground: 0x9a8f78, ground2: 0x6a6250, dust: 0xc0b49a, tile: 0xd8cfae, tile2: 0x8f8468,
+      ground: 0xb2a071, ground2: 0x5f5741, dust: 0xd0c3a2, tile: 0xe6d9ab, tile2: 0x8a7c58,
       sky: { top: 0x2a5fb8, mid: 0x8fbde8, bot: 0xcfd8c0, sun: 0xffefd0, sunSize: 320 },
       fog: 0xa8bcd0, fogD: 0.0022, hemi: 0xa8c8ff, hemiG: 0x8a8068,
       rocks: 55, amp: 3.5, freq: 0.014
@@ -121,7 +121,7 @@
     {
       id: 'top', name: 'Tournament of Power', sub: 'Forty-eight minutes',
       kind: 'ring', radius: 165, ceil: 120, seed: 77, ringR: 150, ringH: 0.8, space: 1,
-      ground: 0x5f6a86, ground2: 0x3a4460, dust: 0x9aa8c8, tile: 0x8f9ab8, tile2: 0x59627e,
+      ground: 0x6e7ba0, ground2: 0x2f3854, dust: 0xa8b6d8, tile: 0x9aa8cc, tile2: 0x505a78,
       sky: { top: 0x080a18, mid: 0x14203a, bot: 0x1a1030, sun: 0x8fb0ff, sunSize: 160, stars: 1 },
       fog: 0x1a2340, fogD: 0.0016, hemi: 0x8fa8ff, hemiG: 0x3a4460,
       rocks: 26, amp: 0, freq: 0, debris: 40
@@ -145,7 +145,7 @@
     {
       id: 'city', name: 'Ruined City', sub: 'Someone will have to fix this',
       kind: 'terrain', radius: 145, ceil: 105, seed: 111,
-      ground: 0x8a8a92, ground2: 0x5a5a62, dust: 0xb0b0b8,
+      ground: 0x9aa0ae, ground2: 0x4a4e5c, dust: 0xc2c6d0,
       sky: { top: 0x3a4a6a, mid: 0x8a90a8, bot: 0xc8a888, sun: 0xffd8a0, sunSize: 260 },
       fog: 0x9aa4b8, fogD: 0.0024, hemi: 0xb8c8e0, hemiG: 0x6a6a72,
       rocks: 20, amp: 1.8, freq: 0.02, buildings: 46
@@ -186,6 +186,7 @@
     this.craters = [];
     this.quality = opts.quality || 'high';
 
+    this.shadows = !!opts.shadows;
     this.buildSky();
     this.buildGround();
     this.buildDecor();
@@ -200,17 +201,52 @@
 
   Arena.prototype.buildLights = function () {
     var d = this.def;
-    /* Total light is kept just under 1.0 so lit surfaces never cross the
-       bloom threshold — the glow belongs to ki, not to grass. */
-    var hemi = new THREE.HemisphereLight(d.hemi, d.hemiG, 0.46);
+    /* A three-point rig, because cel shading lives or dies on where the
+       terminator falls. The key is strong and high so the shadow shape is
+       decisive; fill lifts the dark band off black; the rim picks the
+       fighter off the sky. Total stays just under 1.0 so no lit surface
+       crosses the bloom threshold — the glow belongs to ki, not to grass. */
+    var hemi = new THREE.HemisphereLight(d.hemi, d.hemiG, 0.34);
     this.group.add(hemi);
-    var sun = new THREE.DirectionalLight(0xffffff, 0.42);
-    sun.position.set(60, 110, -80);
-    this.group.add(sun);
-    var rim = new THREE.DirectionalLight(d.sky.sun || 0xffffff, 0.13);
-    rim.position.set(-70, 40, 70);
+
+    var key = new THREE.DirectionalLight(0xfff2dd, 0.62);
+    key.position.set(38, 62, 34);
+    this.group.add(key);
+    this.group.add(key.target);
+    this.sun = key;
+
+    var fill = new THREE.DirectionalLight(d.hemi || 0xbcd4ff, 0.16);
+    fill.position.set(-46, 22, 30);
+    this.group.add(fill);
+
+    var rim = new THREE.DirectionalLight(d.sky.sun || 0xffffff, 0.30);
+    rim.position.set(-32, 30, -60);
     this.group.add(rim);
-    this.sun = sun;
+
+    if (this.shadows) {
+      key.castShadow = true;
+      var sm = key.shadow;
+      sm.mapSize.width = sm.mapSize.height = this.quality === 'high' ? 1024 : 512;
+      sm.camera.near = 1;
+      sm.camera.far = 190;
+      sm.bias = -0.0016;
+      sm.normalBias = 0.035;
+      var R = 17;
+      sm.camera.left = -R; sm.camera.right = R;
+      sm.camera.top = R; sm.camera.bottom = -R;
+      sm.camera.updateProjectionMatrix();
+      this.ground.receiveShadow = true;
+    }
+  };
+
+  /* The shadow frustum is small so the map stays sharp; it therefore has to
+     travel with the fight rather than trying to cover a 150-unit arena. */
+  Arena.prototype.followShadow = function (cx, cy, cz) {
+    if (!this.shadows || !this.sun || !this.sun.castShadow) return;
+    this.sun.target.position.set(cx, cy, cz);
+    this.sun.target.updateMatrixWorld();
+    this.sun.position.set(cx + 38, cy + 62, cz + 34);
+    this.sun.updateMatrixWorld();
   };
 
   /* ------------------------------------------------------------ heightfield */
@@ -287,7 +323,8 @@
       var x = pos.getX(v), z = pos.getZ(v);
       var y = this.baseHeight(x, z);
       pos.setY(v, y);
-      var band = M.sat((y + 4) / 12) + M.fbm2(x * 0.08, z * 0.08, 2) * 0.18;
+      var band = M.sat((y + 4) / 12) + M.fbm2(x * 0.055, z * 0.055, 3) * 0.34 +
+        M.fbm2(x * 0.21, z * 0.21, 2) * 0.10;
       tmp.copy(c2).lerp(c1, M.sat(band));
       if (d.kind === 'ring' && Math.hypot(x, z) < d.ringR) {
         /* the tiled fighting ring */
@@ -299,7 +336,9 @@
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
 
-    var matr = new THREE.MeshLambertMaterial({ vertexColors: true });
+    var matr = new THREE.MeshToonMaterial({
+      vertexColors: true, gradientMap: C.Build.toonGradientSoft()
+    });
     this.ground = new THREE.Mesh(geo, matr);
     this.ground.receiveShadow = true;
     this.group.add(this.ground);
@@ -375,7 +414,7 @@
     var d = this.def, rng = this.rng, i, a, r, x, z, y;
     var mk = C.Build;
 
-    function rockMat(hex) { return new THREE.MeshLambertMaterial({ color: hex, flatShading: true }); }
+    function rockMat(hex) { return C.Build.mat(hex, { flatShading: true }); }
 
     if (d.rocks) {
       var rm = rockMat(d.ground2);
@@ -391,6 +430,7 @@
         rock.position.set(x, y + s * 0.2, z);
         rock.rotation.set(rng() * 3, rng() * 3, rng() * 3);
         rock.receiveShadow = true;
+        rock.castShadow = !!this.shadows;
         this.group.add(rock);
       }
     }
@@ -409,8 +449,8 @@
     }
 
     if (d.trees) {
-      var trunk = new THREE.MeshLambertMaterial({ color: 0x6a4a3a });
-      var leaf = new THREE.MeshLambertMaterial({ color: d.id === 'namek' ? 0x2f8fd8 : 0x3f9f5a, flatShading: true });
+      var trunk = C.Build.mat(0x6a4a3a);
+      var leaf = C.Build.mat(d.id === 'namek' ? 0x2f8fd8 : 0x3f9f5a, { flatShading: true });
       for (i = 0; i < d.trees; i++) {
         a = rng() * M.PI2; r = 28 + rng() * (this.radius - 36);
         x = Math.cos(a) * r; z = Math.sin(a) * r;
@@ -430,9 +470,7 @@
     }
 
     if (d.buildings) {
-      var bm = [new THREE.MeshLambertMaterial({ color: 0x8a8f9a }),
-      new THREE.MeshLambertMaterial({ color: 0x6a707c }),
-      new THREE.MeshLambertMaterial({ color: 0xa89a8a })];
+      var bm = [C.Build.mat(0x8a8f9a), C.Build.mat(0x6a707c), C.Build.mat(0xa89a8a)];
       for (i = 0; i < d.buildings; i++) {
         a = rng() * M.PI2; r = 30 + rng() * (this.radius - 34);
         x = Math.cos(a) * r; z = Math.sin(a) * r;
@@ -451,7 +489,7 @@
     }
 
     if (d.float) {
-      var fm = new THREE.MeshLambertMaterial({ color: d.ground2, flatShading: true });
+      var fm = C.Build.mat(d.ground2, { flatShading: true });
       for (i = 0; i < d.float; i++) {
         a = rng() * M.PI2; r = 40 + rng() * 80;
         var isl = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), fm);
@@ -463,7 +501,7 @@
     }
 
     if (d.debris) {
-      var dm = new THREE.MeshLambertMaterial({ color: 0x6a7490, flatShading: true });
+      var dm = C.Build.mat(0x6a7490, { flatShading: true });
       this.debris = [];
       for (i = 0; i < d.debris; i++) {
         var db = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), dm);
@@ -478,12 +516,12 @@
 
     if (d.dome) {
       /* the Time Chamber's little house and its endless white */
-      var wall = new THREE.MeshLambertMaterial({ color: 0xe8ecf4 });
+      var wall = C.Build.mat(0xe8ecf4);
       var house = new THREE.Mesh(FX.GEO.box, wall);
       house.scale.set(14, 8, 12);
       house.position.set(0, 4, -34);
       this.group.add(house);
-      var roof = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), new THREE.MeshLambertMaterial({ color: 0xc8d0dc }));
+      var roof = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), C.Build.mat(0xc8d0dc));
       roof.scale.set(12, 6, 12);
       roof.rotation.y = Math.PI / 4;
       roof.position.set(0, 11, -34);
@@ -497,15 +535,14 @@
 
     if (d.crowd) {
       /* a ring of seats and a wash of colour for the audience */
-      var seat = new THREE.MeshLambertMaterial({ color: 0xb8ac90 });
+      var seat = C.Build.mat(0xb8ac90, { side: THREE.DoubleSide });
       var stand = new THREE.Mesh(new THREE.CylinderGeometry(46, 40, 12, 40, 1, true), seat);
       stand.position.y = 4;
-      stand.material.side = THREE.DoubleSide;
       this.group.add(stand);
       var people = 260;
       var pg = new THREE.SphereGeometry(0.55, 5, 4);
       var pmat = [0xd85a5a, 0x5a8fd8, 0xd8c85a, 0x5ad88f, 0xd85ad8, 0xf2f2f2].map(function (c) {
-        return new THREE.MeshLambertMaterial({ color: c });
+        return C.Build.mat(c);
       });
       var inst = new THREE.Object3D();
       for (i = 0; i < people; i++) {
@@ -522,15 +559,15 @@
     if (d.tinyPlanet) {
       /* King Kai's house, road and a very small horizon */
       var road = new THREE.Mesh(new THREE.TorusGeometry(30, 2.2, 6, 40),
-        new THREE.MeshLambertMaterial({ color: 0xc8b88a }));
+        C.Build.mat(0xc8b88a));
       road.rotation.x = Math.PI / 2;
       road.position.y = -1.9;
       this.group.add(road);
-      var kh = new THREE.Mesh(FX.GEO.box, new THREE.MeshLambertMaterial({ color: 0xe8d8b0 }));
+      var kh = new THREE.Mesh(FX.GEO.box, C.Build.mat(0xe8d8b0));
       kh.scale.set(9, 6, 9);
       kh.position.set(0, 3, -22);
       this.group.add(kh);
-      var kr = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), new THREE.MeshLambertMaterial({ color: 0xd85a5a }));
+      var kr = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), C.Build.mat(0xd85a5a));
       kr.scale.set(8, 4, 8); kr.rotation.y = Math.PI / 4; kr.position.set(0, 8, -22);
       this.group.add(kr);
     }

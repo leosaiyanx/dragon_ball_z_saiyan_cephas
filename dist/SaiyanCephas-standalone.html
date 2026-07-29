@@ -710,9 +710,46 @@ h3 {
   animation: scrfade 0.25s ease-out;
 }
 
+#scr-title.on {
+  overflow-y: auto;
+}
+
 .screen.clear {
   background: linear-gradient(180deg, rgba(3, 5, 12, 0.55), rgba(3, 5, 12, 0.8));
   backdrop-filter: blur(2px);
+}
+
+/* The title screen wants the live 3D fighter to be the hero, so the veil is
+   heavy behind the menu column and clears away to nothing over the model.
+   A full-screen blur here is what used to leave Goku a dim smudge. */
+.screen.hero {
+  background: linear-gradient(96deg,
+      rgba(4, 6, 14, 0.96) 0%,
+      rgba(4, 6, 14, 0.93) 34%,
+      rgba(6, 9, 20, 0.55) 54%,
+      rgba(6, 9, 20, 0.10) 74%,
+      rgba(6, 9, 20, 0.00) 100%);
+  backdrop-filter: none;
+}
+
+@media (max-aspect-ratio: 1/1) {
+  .screen.hero {
+    background: linear-gradient(180deg,
+        rgba(4, 6, 14, 0.94) 0%,
+        rgba(4, 6, 14, 0.86) 52%,
+        rgba(6, 9, 20, 0.55) 100%);
+  }
+}
+
+/* ------------------------------ menu focus ------------------------------- */
+/* Keyboard and gamepad users get a visible cursor. Mouse users never see it
+   because pointer input clears the focus ring. */
+.navcur {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--gold), 0 0 26px rgba(255, 201, 58, 0.55) !important;
+  border-color: var(--gold) !important;
+  position: relative;
+  z-index: 2;
 }
 
 @keyframes scrfade {
@@ -772,9 +809,59 @@ h3 {
 
 /* ------------------------------- title ---------------------------------- */
 #scr-title {
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  text-align: center;
+}
+
+.titleWrap {
+  margin: auto 0 auto clamp(1.2em, 5vw, 4.5em);
+  text-align: left;
+  width: min(26em, 46vw);
+  padding: 1em 0;
+  /* the column, not the viewport, sets the type scale — otherwise the logo
+     grows past the panel on a wide screen and clips at the top */
+  container-type: inline-size;
+}
+
+#scr-title .logo .l1 {
+  font-size: clamp(0.95em, 3.0vw, 1.8em);
+  letter-spacing: 0.16em;
+}
+
+#scr-title .logo .l2 {
+  font-size: clamp(1.7em, 5.4vw, 3.4em);
+  line-height: 0.98;
+}
+
+#scr-title .logo .l3 {
+  font-size: clamp(0.6em, 1.35vw, 0.9em);
+  letter-spacing: 0.30em;
+  margin-top: 0.35em;
+}
+
+#scr-title .forCephas {
+  font-size: clamp(0.7em, 1.5vw, 0.92em);
+  margin-top: 0.35em;
+}
+
+#scr-title .titleMenu {
+  margin-top: clamp(0.8em, 2.6vh, 1.5em);
+  width: 100%;
+  gap: 0.45em;
+}
+
+#scr-title .btn.wide {
+  min-height: 3.0em;
+  padding: 0.72em 1.1em;
+  font-size: 1em;
+}
+
+@media (max-aspect-ratio: 1/1) {
+  .titleWrap {
+    margin: auto;
+    text-align: center;
+    width: min(32em, 92vw);
+  }
 }
 
 .logo {
@@ -901,8 +988,15 @@ h3 {
 
 .btn.wide {
   width: 100%;
-  font-size: 1.05em;
-  padding: 0.85em 1.2em;
+  font-size: 1.08em;
+  padding: 0.95em 1.25em;
+  min-height: 3.4em;
+}
+
+.btn.wide .ico {
+  font-size: 1.6em;
+  width: 1.4em;
+  text-align: center;
 }
 
 .btn .ico {
@@ -996,10 +1090,44 @@ h3 {
   inset: 0;
 }
 
-.cha .art canvas {
+.cha .art canvas,
+.cha .art img {
   width: 100%;
   height: 100%;
   display: block;
+  object-fit: cover;
+}
+
+.cha .art img.shot {
+  opacity: 0;
+  transition: opacity 0.22s ease-out;
+}
+
+.cha .art img.shot.in {
+  opacity: 1;
+}
+
+.bigshot {
+  width: 100%;
+  max-width: 190px;
+  aspect-ratio: 232/300;
+  margin: 0 auto;
+  border-radius: 0.6em;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  position: relative;
+}
+
+.bigshot img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.25s ease-out;
+}
+
+.bigshot img.in {
+  opacity: 1;
 }
 
 .cha .nm {
@@ -3823,6 +3951,7 @@ var DBZ = (function () {
     'uniform float strength; uniform float radial; uniform vec2 center;',
     'uniform float vignette; uniform float aberr; uniform float flashAmt;',
     'uniform vec3 flashCol; uniform float grade;',
+    'uniform float sat; uniform float contrast; uniform float lift;',
     'varying vec2 vUv;',
     'vec3 sampleBase(vec2 uv){',
     '  if (aberr < 0.001) return texture2D(tBase, uv).rgb;',
@@ -3847,6 +3976,12 @@ var DBZ = (function () {
     '  vec3 col = base + bl * strength;',
     /* gentle filmic shoulder so nothing clips to flat white */
     '  col = col / (1.0 + col * grade);',
+    /* Anime cels are printed, not photographed: push saturation and pull the
+       midtones apart so flat colour fields stay distinct instead of drifting
+       into one another. Without this a whole stage reads as beige haze. */
+    '  float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));',
+    '  col = mix(vec3(lum), col, sat);',
+    '  col = clamp((col - 0.5) * contrast + 0.5 + lift, 0.0, 4.0);',
     '  float d = distance(vUv, vec2(0.5));',
     '  col *= 1.0 - vignette * smoothstep(0.35, 0.95, d);',
     '  col = mix(col, flashCol, flashAmt);',
@@ -3893,7 +4028,8 @@ var DBZ = (function () {
         center: { value: new THREE.Vector2(0.5, 0.5) },
         vignette: { value: 0.42 }, aberr: { value: 0 },
         flashAmt: { value: 0 }, flashCol: { value: new THREE.Vector3(1, 1, 1) },
-        grade: { value: 0.09 }
+        grade: { value: 0.09 },
+        sat: { value: 1.22 }, contrast: { value: 1.10 }, lift: { value: -0.012 }
       }
     });
   }
@@ -4311,15 +4447,15 @@ var DBZ = (function () {
 
   /* rising aura flames */
   FX.auraFlames = function (x, y, z, color, scale, intensity, dt) {
-    var n = 34 * intensity * dt * FX.rate;
+    var n = 62 * intensity * dt * FX.rate;
     var k = Math.floor(n) + (Math.random() < (n % 1) ? 1 : 0);
     for (var i = 0; i < k; i++) {
       var a = M.rand(0, M.PI2), r = M.rand(0, 0.55) * scale;
       FX.streaks.spawn({
         x: x + Math.cos(a) * r, y: y + M.rand(-0.7, 0.9) * scale, z: z + Math.sin(a) * r,
         vx: Math.cos(a) * 0.6, vy: M.rand(4, 9) * scale, vz: Math.sin(a) * 0.6,
-        life: M.rand(0.16, 0.34), drag: 1.2,
-        size: M.rand(0.5, 1.1) * scale, size1: 0.05,
+        life: M.rand(0.20, 0.42), drag: 1.1,
+        size: M.rand(0.55, 1.25) * scale, size1: 0.04,
         color: 0xffffff, boost: 2.4, color1: color, boost1: 3.0, fadeIn: 0.2
       });
     }
@@ -4440,31 +4576,181 @@ var DBZ = (function () {
   var B = {};
   C.Build = B;
 
-  /* ------------------------------------------------------------ materials */
+  /* ============================== cel shading ============================
+     Anime does not shade with a smooth gradient — it fills a flat base
+     colour and drops one hard-edged shadow shape over it. MeshToonMaterial
+     with a stepped gradient map gives exactly that, and unlike a bespoke
+     shader it still gets three.js lighting, fog and shadow maps for free. */
+  var gradientTex = null;
+  function toonGradient() {
+    if (gradientTex) return gradientTex;
+    /* three bands: core shadow, mid, lit. The jump from 0.42 to 0.86 is what
+       makes the terminator a line instead of a fade. */
+    var steps = [110, 178, 255];
+    var data = new Uint8Array(steps.length * 4);
+    for (var i = 0; i < steps.length; i++) {
+      data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = steps[i];
+      data[i * 4 + 3] = 255;
+    }
+    gradientTex = new THREE.DataTexture(data, steps.length, 1, THREE.RGBAFormat);
+    gradientTex.minFilter = gradientTex.magFilter = THREE.NearestFilter;
+    gradientTex.generateMipmaps = false;
+    gradientTex.needsUpdate = true;
+    return gradientTex;
+  }
+  B.toonGradient = toonGradient;
+
+  /* Terrain wants more steps than a character: three hard bands across a
+     whole hillside stripes the horizon, five reads as painted ground. */
+  var softTex = null;
+  function toonGradientSoft() {
+    if (softTex) return softTex;
+    var steps = [126, 162, 196, 226, 255];
+    var data = new Uint8Array(steps.length * 4);
+    for (var i = 0; i < steps.length; i++) {
+      data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = steps[i];
+      data[i * 4 + 3] = 255;
+    }
+    softTex = new THREE.DataTexture(data, steps.length, 1, THREE.RGBAFormat);
+    softTex.minFilter = softTex.magFilter = THREE.NearestFilter;
+    softTex.generateMipmaps = false;
+    softTex.needsUpdate = true;
+    return softTex;
+  }
+  B.toonGradientSoft = toonGradientSoft;
+
+  /* Toon shading alone still leaves a figure looking flat against a bright
+     sky, so every surface also gets a rim term injected into the shader —
+     the bounce light anime uses to separate a character from the
+     background. It is a two-line patch rather than a whole custom material. */
+  function addRim(m, strength) {
+    var k = strength === undefined ? 0.42 : strength;
+    m.onBeforeCompile = function (sh) {
+      sh.uniforms.uRim = { value: k };
+      /* `vNormal` only exists when the material is smooth-shaded, so the
+         normal is grabbed from normal_fragment_begin instead — that local
+         is defined for flat and smooth alike. */
+      sh.fragmentShader = sh.fragmentShader
+        .replace('void main() {',
+          'uniform float uRim;\nvec3 gRimN;\nvoid main() {')
+        .replace('#include <normal_fragment_begin>',
+          '#include <normal_fragment_begin>\n  gRimN = normal;')
+        .replace('#include <dithering_fragment>',
+          '#include <dithering_fragment>\n' +
+          '  float rimT = 1.0 - abs(dot(normalize(gRimN), normalize(vViewPosition)));\n' +
+          '  gl_FragColor.rgb += pow(clamp(rimT, 0.0, 1.0), 3.0) * uRim * diffuseColor.rgb;');
+    };
+    m.customProgramCacheKey = function () { return 'rim' + k; };
+    return m;
+  }
+
   var matCache = {};
   function mat(hex, opts) {
     var key = hex + '|' + (opts ? JSON.stringify(opts) : '');
     var m = matCache[key];
     if (m) return m;
-    m = new THREE.MeshLambertMaterial(Object.assign({ color: hex }, opts || {}));
+    m = makeToon(hex, opts);
     matCache[key] = m;
     return m;
   }
   B.mat = mat;
 
+  function makeToon(hex, opts) {
+    var o = Object.assign({ color: hex, gradientMap: toonGradient() }, opts || {});
+    return addRim(new THREE.MeshToonMaterial(o));
+  }
+
   /* Skin, hair and outfit materials are cloned per fighter so a
      transformation can tint one body without touching everyone else.  */
   function ownMat(hex, opts) {
-    return new THREE.MeshLambertMaterial(Object.assign({ color: hex }, opts || {}));
+    return makeToon(hex, opts);
   }
   B.ownMat = ownMat;
 
   function glowMat(hex, boost) {
     var m = new THREE.MeshBasicMaterial({ color: hex, toneMapped: false });
     m.color.multiplyScalar(boost === undefined ? 2.2 : boost);
+    m.userData.glow = true;
     return m;
   }
   B.glowMat = glowMat;
+
+  /* ================================ outlines =============================
+     Classic inverted hull: the same shape re-drawn backface-only and pushed
+     out along its normals. The offset is scaled by view depth so the ink
+     line stays the same thickness on screen whether the fighter is in your
+     face or across the arena. */
+  var OUTLINE_VERT = [
+    'uniform float uWidth;',
+    'void main(){',
+    '  vec3 n = normalize(normalMatrix * normal);',
+    '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+    '  mv.xyz += n * uWidth * max(0.6, -mv.z);',
+    '  gl_Position = projectionMatrix * mv;',
+    '}'
+  ].join('\n');
+
+  var OUTLINE_FRAG = [
+    'uniform vec3 uColor;',
+    'void main(){ gl_FragColor = vec4(uColor, 1.0); }'
+  ].join('\n');
+
+  B.outlineMaterial = function (width, color) {
+    return new THREE.ShaderMaterial({
+      vertexShader: OUTLINE_VERT, fragmentShader: OUTLINE_FRAG,
+      uniforms: {
+        uWidth: { value: width === undefined ? 0.0080 : width },
+        uColor: { value: new THREE.Color(color === undefined ? 0x0a0a12 : color) }
+      },
+      side: THREE.BackSide, depthWrite: true, depthTest: true, fog: false
+    });
+  };
+
+  /* Every mesh hanging off one joint shares that joint's transform, so they
+     can be baked into a single outline mesh. That turns ~130 extra draw
+     calls per fighter into ~18, which is the difference between outlines
+     being affordable on a phone and not. */
+  function mergeJointOutline(joint, material) {
+    var pos = [], nrm = [], idx = [], base = 0;
+    var mtx = new THREE.Matrix4(), nm = new THREE.Matrix3();
+    var v = new THREE.Vector3();
+    for (var c = 0; c < joint.children.length; c++) {
+      var o = joint.children[c];
+      if (!o.isMesh || o.userData.noOutline) continue;
+      if (o.material && (o.material.userData.glow || o.material.transparent ||
+        o.material.side === THREE.DoubleSide)) continue;
+      var g = o.geometry;
+      if (!g || !g.attributes.position || !g.attributes.normal) continue;
+      o.updateMatrix();
+      mtx.copy(o.matrix);
+      nm.getNormalMatrix(mtx);
+      var p = g.attributes.position, n = g.attributes.normal;
+      for (var i = 0; i < p.count; i++) {
+        v.fromBufferAttribute(p, i).applyMatrix4(mtx);
+        pos.push(v.x, v.y, v.z);
+        v.fromBufferAttribute(n, i).applyMatrix3(nm).normalize();
+        nrm.push(v.x, v.y, v.z);
+      }
+      if (g.index) {
+        var ia = g.index.array;
+        for (var k = 0; k < ia.length; k++) idx.push(ia[k] + base);
+      } else {
+        for (var k2 = 0; k2 < p.count; k2++) idx.push(k2 + base);
+      }
+      base += p.count;
+    }
+    if (!pos.length) return null;
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setIndex(idx);
+    var mesh = new THREE.Mesh(geo, material);
+    mesh.userData.isOutline = true;
+    mesh.renderOrder = -1;
+    joint.add(mesh);
+    return mesh;
+  }
+  B.mergeJointOutline = mergeJointOutline;
 
   /* ------------------------------------------------------- geometry cache */
   var geoCache = {};
@@ -4668,25 +4954,49 @@ var DBZ = (function () {
     var dark = ownMat(0x14141c);
     out.irisMats.push(iris);
 
-    /* Big anime eyes. They read at any distance and carry the whole face. */
-    var ex = hr * 0.38, ey = hr * 0.04, ez = hr * 0.80;
-    var sw = ellip(head, eyeWhite, hr * 0.30, hr * 0.27, hr * 0.20, -ex, ey, ez);
-    var se = ellip(head, eyeWhite, hr * 0.30, hr * 0.27, hr * 0.20, ex, ey, ez);
+    /* Big anime eyes, built in layers: a dark socket that peeks out as the
+       ink line round the lid, the white, a tall iris and a highlight. That
+       stack is what separates an anime eye from two dots on a ball. */
+    var ex = hr * 0.38, ey = hr * 0.05, ez = hr * 0.78;
+    var socket = [
+      ellip(head, dark, hr * 0.34, hr * 0.31, hr * 0.15, -ex, ey, ez - hr * 0.02),
+      ellip(head, dark, hr * 0.34, hr * 0.31, hr * 0.15, ex, ey, ez - hr * 0.02)
+    ];
+    socket[0].rotation.z = 0.16; socket[1].rotation.z = -0.16;
+    var sw = ellip(head, eyeWhite, hr * 0.29, hr * 0.26, hr * 0.23, -ex, ey, ez + hr * 0.07);
+    var se = ellip(head, eyeWhite, hr * 0.29, hr * 0.26, hr * 0.23, ex, ey, ez + hr * 0.07);
+    sw.rotation.z = 0.16; se.rotation.z = -0.16;
+    sw.userData.noOutline = true; se.userData.noOutline = true;
+    socket[0].userData.noOutline = true; socket[1].userData.noOutline = true;
     out.eyeWhites = [sw, se];
     out.pupils = [
-      ellip(head, iris, hr * 0.16, hr * 0.22, hr * 0.13, -ex, ey, ez + hr * 0.14),
-      ellip(head, iris, hr * 0.16, hr * 0.22, hr * 0.13, ex, ey, ez + hr * 0.14)
+      ellip(head, iris, hr * 0.14, hr * 0.22, hr * 0.15, -ex, ey, ez + hr * 0.21),
+      ellip(head, iris, hr * 0.14, hr * 0.22, hr * 0.15, ex, ey, ez + hr * 0.21)
     ];
+    /* pupil core and catchlight */
+    ellip(head, dark, hr * 0.08, hr * 0.14, hr * 0.10, -ex, ey - hr * 0.01, ez + hr * 0.26)
+      .userData.noOutline = true;
+    ellip(head, dark, hr * 0.08, hr * 0.14, hr * 0.10, ex, ey - hr * 0.01, ez + hr * 0.26)
+      .userData.noOutline = true;
+    var shine = ownMat(0xffffff);
+    ellip(head, shine, hr * 0.055, hr * 0.065, hr * 0.05,
+      -ex + hr * 0.08, ey + hr * 0.11, ez + hr * 0.28).userData.noOutline = true;
+    ellip(head, shine, hr * 0.055, hr * 0.065, hr * 0.05,
+      ex + hr * 0.08, ey + hr * 0.11, ez + hr * 0.28).userData.noOutline = true;
 
     /* angry anime brows — the single strongest read on a low-poly face */
-    var bl = plate(head, dark, hr * 0.44, hr * 0.10, hr * 0.12, -ex, hr * 0.40, ez + hr * 0.06);
-    var br = plate(head, dark, hr * 0.44, hr * 0.10, hr * 0.12, ex, hr * 0.40, ez + hr * 0.06);
-    bl.rotation.z = -0.34; br.rotation.z = 0.34;
+    var bl = plate(head, dark, hr * 0.46, hr * 0.11, hr * 0.13, -ex, hr * 0.44, ez + hr * 0.08);
+    var br = plate(head, dark, hr * 0.46, hr * 0.11, hr * 0.13, ex, hr * 0.44, ez + hr * 0.08);
+    bl.rotation.z = -0.40; br.rotation.z = 0.40;
+    bl.userData.noOutline = true; br.userData.noOutline = true;
+    out.pupils[0].userData.noOutline = true;
+    out.pupils[1].userData.noOutline = true;
     out.brows = [bl, br];
     if (spec.head && spec.head.noBrow) { bl.visible = br.visible = false; }
 
     /* mouth — a thin dark slab that opens for shouts */
     var mouth = plate(head, dark, hr * 0.30, hr * 0.055, hr * 0.10, 0, -hr * 0.46, hr * 0.80);
+    mouth.userData.noOutline = true;
     out.mouth = mouth;
 
     /* nose hint */
@@ -5064,9 +5374,8 @@ var DBZ = (function () {
     function cape(material) {
       var g = new THREE.CylinderGeometry(1, 1.35, 1, 14, 9, true,
         Math.PI * 0.42, Math.PI * 1.16);
-      var cp = new THREE.Mesh(g, new THREE.MeshLambertMaterial({
-        color: material, side: THREE.DoubleSide, flatShading: false
-      }));
+      var cp = new THREE.Mesh(g, makeToon(material, { side: THREE.DoubleSide }));
+      cp.userData.noOutline = true;
       cp.scale.set(W * 1.12, H * 0.50, W * 0.95);
       cp.position.set(0, torsoTop * 0.52 - H * 0.25, 0);
       rig.torso.add(cp);
@@ -5557,14 +5866,47 @@ var DBZ = (function () {
     buildOutfit(rig, spec, P, out);
     if (spec.tail) buildTail(rig, spec, P, out, spec.fit && spec.fit.fur ? spec.fit.fur : null);
 
-    /* shadows only on the chunky bits — cheap and looks the same */
     group.traverse(function (o) {
       if (o.isMesh) { o.castShadow = !!opts.shadows; o.receiveShadow = false; o.matrixAutoUpdate = true; }
     });
 
+    /* --- ink outlines --------------------------------------------------
+       One baked outline mesh per joint. Anything transparent, additive or
+       double-sided is skipped: an inverted hull round a translucent sheet
+       reads as a black smear rather than a line. */
+    if (opts.outline !== false) {
+      out.outlineMat = B.outlineMaterial(opts.outlineWidth || 0.0080);
+      out.outlines = [];
+      var joints = [rig.hips, rig.torso, rig.chest, rig.head, rig.headInner,
+      rig.armL, rig.foreL, rig.handL, rig.armR, rig.foreR, rig.handR,
+      rig.legL, rig.shinL, rig.footL, rig.legR, rig.shinR, rig.footR];
+      for (var ji = 0; ji < joints.length; ji++) {
+        if (!joints[ji]) continue;
+        var om = mergeJointOutline(joints[ji], out.outlineMat);
+        if (om) out.outlines.push(om);
+      }
+    }
+
     out.group = group;
     out.height = H;
     return out;
+  };
+
+  /* Outlines are baked from the mesh layout, so a transformation that swaps
+     the hair has to rebuild the head's line art or it keeps the old spikes. */
+  B.rebuildOutline = function (built, joint) {
+    if (!built.outlineMat || !joint) return;
+    for (var i = joint.children.length - 1; i >= 0; i--) {
+      var c = joint.children[i];
+      if (c.userData && c.userData.isOutline) {
+        joint.remove(c);
+        if (c.geometry) c.geometry.dispose();
+        var k = built.outlines.indexOf(c);
+        if (k >= 0) built.outlines.splice(k, 1);
+      }
+    }
+    var om = mergeJointOutline(joint, built.outlineMat);
+    if (om) built.outlines.push(om);
   };
 
   /* --------------------------------------------------------- retinting ---
@@ -5592,6 +5934,7 @@ var DBZ = (function () {
     built.hairMats.length = 0;
     built.maneStrands.length = 0;
     buildHair(built.rig.headInner, hairSpec, built.P.headR, built);
+    B.rebuildOutline(built, built.rig.headInner);
   };
 
 })(DBZ);
@@ -6175,11 +6518,19 @@ var DBZ = (function () {
   var AURA_VERT = [
     'varying vec2 vUv; varying float vRim;',
     'uniform float uTime; uniform float uWob;',
+    'float h1(float n){ return fract(sin(n) * 43758.5453); }',
     'void main(){',
     '  vUv = uv;',
     '  vec3 p = position;',
-    '  float w = sin(uTime * 9.0 + p.y * 6.0 + p.x * 3.0) * 0.5 + sin(uTime * 13.0 + p.z * 5.0) * 0.5;',
-    '  p.xz *= 1.0 + w * uWob * (0.25 + uv.y * 0.9);',
+    /* Ragged the silhouette on purpose. A smooth cone always reads as a cone
+       no matter how it is shaded; breaking the outer edge with noise is what
+       turns it into a column of fire. */
+    '  float band = floor(uv.x * 13.0);',
+    '  float rough = h1(band * 12.9898 + floor(uTime * 7.0) * 3.71) * 0.6',
+    '               + h1(band * 4.1 + floor(uTime * 11.0) * 1.37) * 0.4;',
+    '  float w = sin(uTime * 9.0 + p.y * 6.0 + p.x * 3.0) * 0.4',
+    '          + sin(uTime * 13.0 + p.z * 5.0) * 0.3 + (rough - 0.5) * 1.6;',
+    '  p.xz *= 1.0 + w * uWob * (0.22 + uv.y * 1.15);',
     '  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
     /* rim term: the shell is transparent face-on and bright at the silhouette,
        which is what stops it reading as a solid cone */
@@ -6205,12 +6556,18 @@ var DBZ = (function () {
     '  vec2 q = vec2(vUv.x * uTongues, vUv.y * 2.2 - uTime * 2.4);',
     '  float n = vnoise(q) * 0.6 + vnoise(q * 2.3 + 11.0) * 0.4;',
     /* flames thin out toward the tip; the noise eats into them as they rise */
-    '  float body = smoothstep(0.0, 0.06, vUv.y) * pow(1.0 - vUv.y, 1.5);',
-    '  float tongue = smoothstep(0.46, 0.92, n + (1.0 - vUv.y) * 0.55);',
-    '  float rim = pow(clamp(vRim, 0.0, 1.0), 2.2);',
-    '  float a = clamp(rim * body * 1.15 + tongue * body * 1.45, 0.0, 1.0) * uIntensity;',
+    /* The base of the cone has to fade out too. Leaving it solid draws a
+       bright ring round the fighter's feet, which is what makes an aura read
+       as a glass lampshade instead of fire. */
+    '  float body = smoothstep(0.02, 0.26, vUv.y) * pow(1.0 - vUv.y, 1.25);',
+    '  float tongue = smoothstep(0.47, 0.86, n + (1.0 - vUv.y) * 0.42);',
+    '  float rim = pow(clamp(vRim, 0.0, 1.0), 2.6);',
+    /* Alpha is capped below 1 on purpose. Additive blending plus an
+       uncapped intensity turns a full-power aura into an opaque white cone
+       with the fighter hidden inside it. */
+    '  float a = clamp((rim * body * 0.14 + tongue * body * 2.25) * uIntensity, 0.0, 0.82);',
     '  vec3 col = mix(uColor, uCore, smoothstep(0.25, 0.9, n) * (1.0 - vUv.y * 0.5));',
-    '  gl_FragColor = vec4(col * (0.75 + n * 1.7), a);',
+    '  gl_FragColor = vec4(col * (0.55 + n * 1.15), a);',
     '}'
   ].join('\n');
 
@@ -6222,7 +6579,7 @@ var DBZ = (function () {
       uniforms: {
         uTime: { value: 0 }, uColor: { value: new THREE.Color(0x59c8ff) },
         uCore: { value: new THREE.Color(0xffffff) }, uIntensity: { value: 0 },
-        uWob: { value: 0.10 }, uTongues: { value: 7 }
+        uWob: { value: 0.30 }, uTongues: { value: 13 }
       },
       transparent: true, depthWrite: false, side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending
@@ -6267,8 +6624,8 @@ var DBZ = (function () {
     this.model.add(this.aura);
     this.auraCore = makeAura(this.height * 0.86, this.P.shoulderW * 1.45);
     this.auraCore.position.y = -this.height * 0.03;
-    this.auraCore.material.uniforms.uTongues.value = 4;
-    this.auraCore.material.uniforms.uWob.value = 0.05;
+    this.auraCore.material.uniforms.uTongues.value = 7;
+    this.auraCore.material.uniforms.uWob.value = 0.18;
     this.model.add(this.auraCore);
 
     /* ---- transform state ---- */
@@ -6982,19 +7339,21 @@ var DBZ = (function () {
     /* Non-linear so a resting fighter's aura all but disappears. A linear
        ramp left a faintly lit cone around everyone at all times, which read
        as a glass lampshade rather than as ki. */
-    var lv = Math.pow(Math.max(0, this.auraLevel), 1.7);
+    var lv = Math.min(1.55, Math.pow(Math.max(0, this.auraLevel), 1.7));
     var show = this.auraLevel > 0.20;
     this.aura.visible = show;
     this.auraCore.visible = show;
-    u.uIntensity.value = lv * 0.70;
-    u2.uIntensity.value = lv * 0.58;
+    u.uIntensity.value = lv * 0.20;
+    u2.uIntensity.value = lv * 0.26;
     var s = 1 + this.auraLevel * 0.10;
     this.aura.scale.set(s, 1 + this.auraLevel * 0.20, s);
 
     /* flame particles + lightning for the higher forms */
     if (this.auraLevel > 0.25 && this.alive) {
-      FX.auraFlames(this.pos.x, this.pos.y + this.chestOff * 0.8, this.pos.z,
-        this.auraColor, this.height * 0.42, Math.min(2, this.auraLevel), dt);
+      /* Particles, not the shell, are what the aura actually is — the mesh
+         is a cone and will always read as one, however it is shaded. */
+      FX.auraFlames(this.pos.x, this.pos.y + this.chestOff * 0.72, this.pos.z,
+        this.auraColor, this.height * 0.50, Math.min(2.6, this.auraLevel * 1.9), dt);
       var f = this.form();
       var sparks = f ? (f.sparks || 0) : 0;
       if (this.state === 'charge') sparks += 0.8;
@@ -8924,7 +9283,7 @@ var DBZ = (function () {
     {
       id: 'wasteland', name: 'Rocky Wasteland', sub: 'Where it usually starts',
       kind: 'terrain', radius: 150, ceil: 105, seed: 7,
-      ground: 0xa08560, ground2: 0x6e5a40, dust: 0xbfa580,
+      ground: 0xc09a62, ground2: 0x6a4f31, dust: 0xd8b98a,
       sky: { top: 0x2f6ec8, mid: 0x8fc4ec, bot: 0xd8c9a8, sun: 0xffe9c0, sunSize: 300 },
       fog: 0x9fb6cf, fogD: 0.0022, hemi: 0x9fc8ff, hemiG: 0xa08560,
       rocks: 90, amp: 5.5, freq: 0.012
@@ -8940,7 +9299,7 @@ var DBZ = (function () {
     {
       id: 'cellgames', name: 'Cell Games Arena', sub: 'Ten fighters, one ring',
       kind: 'ring', radius: 130, ceil: 100, seed: 33, ringR: 22, ringH: 1.2,
-      ground: 0x9a8f78, ground2: 0x6a6250, dust: 0xc0b49a, tile: 0xd8cfae, tile2: 0x8f8468,
+      ground: 0xb2a071, ground2: 0x5f5741, dust: 0xd0c3a2, tile: 0xe6d9ab, tile2: 0x8a7c58,
       sky: { top: 0x2a5fb8, mid: 0x8fbde8, bot: 0xcfd8c0, sun: 0xffefd0, sunSize: 320 },
       fog: 0xa8bcd0, fogD: 0.0022, hemi: 0xa8c8ff, hemiG: 0x8a8068,
       rocks: 55, amp: 3.5, freq: 0.014
@@ -8972,7 +9331,7 @@ var DBZ = (function () {
     {
       id: 'top', name: 'Tournament of Power', sub: 'Forty-eight minutes',
       kind: 'ring', radius: 165, ceil: 120, seed: 77, ringR: 150, ringH: 0.8, space: 1,
-      ground: 0x5f6a86, ground2: 0x3a4460, dust: 0x9aa8c8, tile: 0x8f9ab8, tile2: 0x59627e,
+      ground: 0x6e7ba0, ground2: 0x2f3854, dust: 0xa8b6d8, tile: 0x9aa8cc, tile2: 0x505a78,
       sky: { top: 0x080a18, mid: 0x14203a, bot: 0x1a1030, sun: 0x8fb0ff, sunSize: 160, stars: 1 },
       fog: 0x1a2340, fogD: 0.0016, hemi: 0x8fa8ff, hemiG: 0x3a4460,
       rocks: 26, amp: 0, freq: 0, debris: 40
@@ -8996,7 +9355,7 @@ var DBZ = (function () {
     {
       id: 'city', name: 'Ruined City', sub: 'Someone will have to fix this',
       kind: 'terrain', radius: 145, ceil: 105, seed: 111,
-      ground: 0x8a8a92, ground2: 0x5a5a62, dust: 0xb0b0b8,
+      ground: 0x9aa0ae, ground2: 0x4a4e5c, dust: 0xc2c6d0,
       sky: { top: 0x3a4a6a, mid: 0x8a90a8, bot: 0xc8a888, sun: 0xffd8a0, sunSize: 260 },
       fog: 0x9aa4b8, fogD: 0.0024, hemi: 0xb8c8e0, hemiG: 0x6a6a72,
       rocks: 20, amp: 1.8, freq: 0.02, buildings: 46
@@ -9037,6 +9396,7 @@ var DBZ = (function () {
     this.craters = [];
     this.quality = opts.quality || 'high';
 
+    this.shadows = !!opts.shadows;
     this.buildSky();
     this.buildGround();
     this.buildDecor();
@@ -9051,17 +9411,52 @@ var DBZ = (function () {
 
   Arena.prototype.buildLights = function () {
     var d = this.def;
-    /* Total light is kept just under 1.0 so lit surfaces never cross the
-       bloom threshold — the glow belongs to ki, not to grass. */
-    var hemi = new THREE.HemisphereLight(d.hemi, d.hemiG, 0.46);
+    /* A three-point rig, because cel shading lives or dies on where the
+       terminator falls. The key is strong and high so the shadow shape is
+       decisive; fill lifts the dark band off black; the rim picks the
+       fighter off the sky. Total stays just under 1.0 so no lit surface
+       crosses the bloom threshold — the glow belongs to ki, not to grass. */
+    var hemi = new THREE.HemisphereLight(d.hemi, d.hemiG, 0.34);
     this.group.add(hemi);
-    var sun = new THREE.DirectionalLight(0xffffff, 0.42);
-    sun.position.set(60, 110, -80);
-    this.group.add(sun);
-    var rim = new THREE.DirectionalLight(d.sky.sun || 0xffffff, 0.13);
-    rim.position.set(-70, 40, 70);
+
+    var key = new THREE.DirectionalLight(0xfff2dd, 0.62);
+    key.position.set(38, 62, 34);
+    this.group.add(key);
+    this.group.add(key.target);
+    this.sun = key;
+
+    var fill = new THREE.DirectionalLight(d.hemi || 0xbcd4ff, 0.16);
+    fill.position.set(-46, 22, 30);
+    this.group.add(fill);
+
+    var rim = new THREE.DirectionalLight(d.sky.sun || 0xffffff, 0.30);
+    rim.position.set(-32, 30, -60);
     this.group.add(rim);
-    this.sun = sun;
+
+    if (this.shadows) {
+      key.castShadow = true;
+      var sm = key.shadow;
+      sm.mapSize.width = sm.mapSize.height = this.quality === 'high' ? 1024 : 512;
+      sm.camera.near = 1;
+      sm.camera.far = 190;
+      sm.bias = -0.0016;
+      sm.normalBias = 0.035;
+      var R = 17;
+      sm.camera.left = -R; sm.camera.right = R;
+      sm.camera.top = R; sm.camera.bottom = -R;
+      sm.camera.updateProjectionMatrix();
+      this.ground.receiveShadow = true;
+    }
+  };
+
+  /* The shadow frustum is small so the map stays sharp; it therefore has to
+     travel with the fight rather than trying to cover a 150-unit arena. */
+  Arena.prototype.followShadow = function (cx, cy, cz) {
+    if (!this.shadows || !this.sun || !this.sun.castShadow) return;
+    this.sun.target.position.set(cx, cy, cz);
+    this.sun.target.updateMatrixWorld();
+    this.sun.position.set(cx + 38, cy + 62, cz + 34);
+    this.sun.updateMatrixWorld();
   };
 
   /* ------------------------------------------------------------ heightfield */
@@ -9138,7 +9533,8 @@ var DBZ = (function () {
       var x = pos.getX(v), z = pos.getZ(v);
       var y = this.baseHeight(x, z);
       pos.setY(v, y);
-      var band = M.sat((y + 4) / 12) + M.fbm2(x * 0.08, z * 0.08, 2) * 0.18;
+      var band = M.sat((y + 4) / 12) + M.fbm2(x * 0.055, z * 0.055, 3) * 0.34 +
+        M.fbm2(x * 0.21, z * 0.21, 2) * 0.10;
       tmp.copy(c2).lerp(c1, M.sat(band));
       if (d.kind === 'ring' && Math.hypot(x, z) < d.ringR) {
         /* the tiled fighting ring */
@@ -9150,7 +9546,9 @@ var DBZ = (function () {
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
 
-    var matr = new THREE.MeshLambertMaterial({ vertexColors: true });
+    var matr = new THREE.MeshToonMaterial({
+      vertexColors: true, gradientMap: C.Build.toonGradientSoft()
+    });
     this.ground = new THREE.Mesh(geo, matr);
     this.ground.receiveShadow = true;
     this.group.add(this.ground);
@@ -9226,7 +9624,7 @@ var DBZ = (function () {
     var d = this.def, rng = this.rng, i, a, r, x, z, y;
     var mk = C.Build;
 
-    function rockMat(hex) { return new THREE.MeshLambertMaterial({ color: hex, flatShading: true }); }
+    function rockMat(hex) { return C.Build.mat(hex, { flatShading: true }); }
 
     if (d.rocks) {
       var rm = rockMat(d.ground2);
@@ -9242,6 +9640,7 @@ var DBZ = (function () {
         rock.position.set(x, y + s * 0.2, z);
         rock.rotation.set(rng() * 3, rng() * 3, rng() * 3);
         rock.receiveShadow = true;
+        rock.castShadow = !!this.shadows;
         this.group.add(rock);
       }
     }
@@ -9260,8 +9659,8 @@ var DBZ = (function () {
     }
 
     if (d.trees) {
-      var trunk = new THREE.MeshLambertMaterial({ color: 0x6a4a3a });
-      var leaf = new THREE.MeshLambertMaterial({ color: d.id === 'namek' ? 0x2f8fd8 : 0x3f9f5a, flatShading: true });
+      var trunk = C.Build.mat(0x6a4a3a);
+      var leaf = C.Build.mat(d.id === 'namek' ? 0x2f8fd8 : 0x3f9f5a, { flatShading: true });
       for (i = 0; i < d.trees; i++) {
         a = rng() * M.PI2; r = 28 + rng() * (this.radius - 36);
         x = Math.cos(a) * r; z = Math.sin(a) * r;
@@ -9281,9 +9680,7 @@ var DBZ = (function () {
     }
 
     if (d.buildings) {
-      var bm = [new THREE.MeshLambertMaterial({ color: 0x8a8f9a }),
-      new THREE.MeshLambertMaterial({ color: 0x6a707c }),
-      new THREE.MeshLambertMaterial({ color: 0xa89a8a })];
+      var bm = [C.Build.mat(0x8a8f9a), C.Build.mat(0x6a707c), C.Build.mat(0xa89a8a)];
       for (i = 0; i < d.buildings; i++) {
         a = rng() * M.PI2; r = 30 + rng() * (this.radius - 34);
         x = Math.cos(a) * r; z = Math.sin(a) * r;
@@ -9302,7 +9699,7 @@ var DBZ = (function () {
     }
 
     if (d.float) {
-      var fm = new THREE.MeshLambertMaterial({ color: d.ground2, flatShading: true });
+      var fm = C.Build.mat(d.ground2, { flatShading: true });
       for (i = 0; i < d.float; i++) {
         a = rng() * M.PI2; r = 40 + rng() * 80;
         var isl = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), fm);
@@ -9314,7 +9711,7 @@ var DBZ = (function () {
     }
 
     if (d.debris) {
-      var dm = new THREE.MeshLambertMaterial({ color: 0x6a7490, flatShading: true });
+      var dm = C.Build.mat(0x6a7490, { flatShading: true });
       this.debris = [];
       for (i = 0; i < d.debris; i++) {
         var db = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), dm);
@@ -9329,12 +9726,12 @@ var DBZ = (function () {
 
     if (d.dome) {
       /* the Time Chamber's little house and its endless white */
-      var wall = new THREE.MeshLambertMaterial({ color: 0xe8ecf4 });
+      var wall = C.Build.mat(0xe8ecf4);
       var house = new THREE.Mesh(FX.GEO.box, wall);
       house.scale.set(14, 8, 12);
       house.position.set(0, 4, -34);
       this.group.add(house);
-      var roof = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), new THREE.MeshLambertMaterial({ color: 0xc8d0dc }));
+      var roof = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), C.Build.mat(0xc8d0dc));
       roof.scale.set(12, 6, 12);
       roof.rotation.y = Math.PI / 4;
       roof.position.set(0, 11, -34);
@@ -9348,15 +9745,14 @@ var DBZ = (function () {
 
     if (d.crowd) {
       /* a ring of seats and a wash of colour for the audience */
-      var seat = new THREE.MeshLambertMaterial({ color: 0xb8ac90 });
+      var seat = C.Build.mat(0xb8ac90, { side: THREE.DoubleSide });
       var stand = new THREE.Mesh(new THREE.CylinderGeometry(46, 40, 12, 40, 1, true), seat);
       stand.position.y = 4;
-      stand.material.side = THREE.DoubleSide;
       this.group.add(stand);
       var people = 260;
       var pg = new THREE.SphereGeometry(0.55, 5, 4);
       var pmat = [0xd85a5a, 0x5a8fd8, 0xd8c85a, 0x5ad88f, 0xd85ad8, 0xf2f2f2].map(function (c) {
-        return new THREE.MeshLambertMaterial({ color: c });
+        return C.Build.mat(c);
       });
       var inst = new THREE.Object3D();
       for (i = 0; i < people; i++) {
@@ -9373,15 +9769,15 @@ var DBZ = (function () {
     if (d.tinyPlanet) {
       /* King Kai's house, road and a very small horizon */
       var road = new THREE.Mesh(new THREE.TorusGeometry(30, 2.2, 6, 40),
-        new THREE.MeshLambertMaterial({ color: 0xc8b88a }));
+        C.Build.mat(0xc8b88a));
       road.rotation.x = Math.PI / 2;
       road.position.y = -1.9;
       this.group.add(road);
-      var kh = new THREE.Mesh(FX.GEO.box, new THREE.MeshLambertMaterial({ color: 0xe8d8b0 }));
+      var kh = new THREE.Mesh(FX.GEO.box, C.Build.mat(0xe8d8b0));
       kh.scale.set(9, 6, 9);
       kh.position.set(0, 3, -22);
       this.group.add(kh);
-      var kr = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), new THREE.MeshLambertMaterial({ color: 0xd85a5a }));
+      var kr = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 4), C.Build.mat(0xd85a5a));
       kr.scale.set(8, 4, 8); kr.rotation.y = Math.PI / 4; kr.position.set(0, 8, -22);
       this.group.add(kr);
     }
@@ -10696,6 +11092,8 @@ var DBZ = (function () {
     window.addEventListener('keydown', function (e) {
       if (e.repeat) return;
       if (e.code === 'Tab' || e.code === 'Space' || e.code.indexOf('Arrow') === 0) e.preventDefault();
+      /* While a menu is open the keyboard drives the menu, not the fighter. */
+      if (C.UI && C.UI.current && C.UI.navKey(e.code)) { e.preventDefault(); return; }
       applyKey(e.code, true);
     }, { passive: false });
 
@@ -10725,6 +11123,10 @@ var DBZ = (function () {
       I.wheel = (I.wheel || 0) + Math.sign(e.deltaY);
       e.preventDefault();
     }, { passive: false });
+
+    window.addEventListener('pointerdown', function () {
+      if (C.UI && C.UI.navClear) C.UI.navClear();
+    }, true);
 
     I.initTouch();
   };
@@ -10931,6 +11333,175 @@ var DBZ = (function () {
       ['SP', 'Special moves'], ['ULT', 'Ultimate'], ['⚡', 'Transform']
     ]
   };
+
+})(DBZ);
+
+</script>
+  <script>
+/* ============================================================================
+   Dragon Ball Z: Saiyan Cephas — 3D roster portraits
+
+   The select screen used to show hand-drawn 2D badges, which stopped matching
+   the game the moment the fighters became cel-shaded. These render the actual
+   character model to an offscreen target instead, so a tile is a picture of
+   the thing you are about to play.
+
+   Building 79 fighters at once would stall the page, so tiles are rendered
+   lazily: only what scrolls into view, a couple per frame, cached forever.
+   ==========================================================================*/
+(function (C) {
+  'use strict';
+
+  var P = {};
+  C.Portrait = P;
+
+  var W = 232, H = 300;
+  var rt = null, scene = null, cam = null, ready = false;
+  var cache = {};                 /* id -> dataURL */
+  var queue = [], pending = {};
+  var pixels = null;
+
+  function init(renderer) {
+    if (ready) return true;
+    if (!renderer) return false;
+    scene = new THREE.Scene();
+
+    cam = new THREE.PerspectiveCamera(26, W / H, 0.1, 60);
+
+    /* Portrait lighting is its own rig: a strong key from screen-left so the
+       cel terminator falls across the face, and a hot rim from behind to cut
+       the silhouette out of the card background. */
+    /* Portraits bypass the bloom composite, so there is no filmic shoulder to
+       catch overexposure — the rig has to stay under 1.0 on its own or every
+       face renders as a white blob. */
+    var hemi = new THREE.HemisphereLight(0xcfe2ff, 0x2a2036, 0.28);
+    scene.add(hemi);
+    var key = new THREE.DirectionalLight(0xfff4e2, 0.52);
+    key.position.set(-3.4, 4.6, 4.2);
+    scene.add(key);
+    var rim = new THREE.DirectionalLight(0x9ec8ff, 0.26);
+    rim.position.set(3.2, 2.4, -3.6);
+    scene.add(rim);
+    var fill = new THREE.DirectionalLight(0xffd9a8, 0.10);
+    fill.position.set(2.8, 0.6, 3.2);
+    scene.add(fill);
+
+    rt = new THREE.WebGLRenderTarget(W, H, {
+      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat, type: THREE.UnsignedByteType,
+      depthBuffer: true, stencilBuffer: false
+    });
+    pixels = new Uint8Array(W * H * 4);
+    ready = true;
+    return true;
+  }
+  P.init = init;
+
+  P.has = function (id) { return !!cache[id]; };
+  P.get = function (id) { return cache[id]; };
+
+  /* Ask for a portrait. `cb(dataURL)` fires once it exists — immediately if
+     it is already cached. */
+  P.request = function (spec, cb) {
+    if (cache[spec.id]) { cb(cache[spec.id]); return; }
+    var e = pending[spec.id];
+    if (e) { e.cbs.push(cb); return; }
+    e = pending[spec.id] = { spec: spec, cbs: [cb] };
+    queue.push(e);
+  };
+
+  P.cancel = function (id) {
+    var e = pending[id];
+    if (!e) return;
+    var i = queue.indexOf(e);
+    if (i >= 0) queue.splice(i, 1);
+    delete pending[id];
+  };
+
+  P.clearQueue = function () { queue.length = 0; pending = {}; };
+
+  function renderOne(renderer, spec) {
+    var f = new C.Fighter(spec, { side: 0, shadows: false });
+    f.pos.set(0, 0, 0);
+    f.yaw = 0.40;
+    f.target = null;
+    f.baseGlow = 0;
+    f.aura.visible = false;
+    f.auraCore.visible = false;
+    C.Anim.copy(C.Anim.POSE.stance, f.poseTarget);
+    f.poseBlend = 999;
+    f.animT = 0.8;
+    f.applyPose(1);
+    f.syncTransform();
+    scene.add(f.group);
+
+    /* Frame on the head and shoulders — a full body at this size is a smudge,
+       and the face is what tells you who it is. Aim at the actual head joint,
+       not a fraction of body height: tall hair lives well above the skull and
+       gets guillotined otherwise. */
+    var focus = f.P.headY - f.height * 0.04;
+    cam.position.set(0.38, focus + 0.02, f.height * 1.20);
+    cam.lookAt(0, focus, 0);
+    cam.updateProjectionMatrix();
+
+    var prevTarget = renderer.getRenderTarget();
+    var prevClear = new THREE.Color();
+    renderer.getClearColor(prevClear);
+    var prevAlpha = renderer.getClearAlpha();
+
+    renderer.setRenderTarget(rt);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear(true, true, true);
+    renderer.render(scene, cam);
+    renderer.readRenderTargetPixels(rt, 0, 0, W, H, pixels);
+    renderer.setRenderTarget(prevTarget);
+    renderer.setClearColor(prevClear, prevAlpha);
+
+    scene.remove(f.group);
+    f.dispose();
+
+    /* GL reads bottom-up; canvas is top-down. */
+    var cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    var g = cv.getContext('2d');
+    var img = g.createImageData(W, H);
+    for (var y = 0; y < H; y++) {
+      var src = (H - 1 - y) * W * 4;
+      var dst = y * W * 4;
+      for (var x = 0; x < W * 4; x++) img.data[dst + x] = pixels[src + x];
+    }
+    g.putImageData(img, 0, 0);
+    return cv.toDataURL('image/png');
+  }
+
+  /* Called from the game loop while a menu is open. Budgeted so the menu
+     never hitches: a couple of characters per frame at most. */
+  P.pump = function (renderer, budget) {
+    if (!queue.length) return 0;
+    if (!init(renderer)) return 0;
+    var n = 0, max = budget === undefined ? 2 : budget;
+    var t0 = (window.performance && performance.now) ? performance.now() : 0;
+    while (queue.length && n < max) {
+      var e = queue.shift();
+      if (!pending[e.spec.id]) continue;
+      var url;
+      try { url = renderOne(renderer, e.spec); }
+      catch (err) { url = null; }
+      delete pending[e.spec.id];
+      if (url) {
+        cache[e.spec.id] = url;
+        for (var i = 0; i < e.cbs.length; i++) {
+          try { e.cbs[i](url); } catch (err2) { }
+        }
+      }
+      n++;
+      /* if a single character was unusually slow, stop early */
+      if (t0 && performance.now() - t0 > 12) break;
+    }
+    return n;
+  };
+
+  P.queued = function () { return queue.length; };
 
 })(DBZ);
 
@@ -11253,6 +11824,130 @@ var DBZ = (function () {
   }
   U.shade = shade;
 
+  /* ============================ menu navigation ==========================
+     Arrow keys, WASD and a gamepad all drive the menus. Without this a kid
+     with a controller has to put it down and reach for the mouse every time
+     the game leaves a fight, which is the single most annoying thing a
+     console-style game can do. Movement is geometric — nearest item in the
+     direction you pushed — so it works on button columns and on the 79-tile
+     roster grid without either needing to know about the other. */
+  var nav = { items: [], idx: -1, active: false };
+  U.nav = nav;
+
+  var NAV_SEL = '.btn, .saga, .fight, .chip, .cha, .seg button, .scr-foot button';
+
+  function navCollect() {
+    var scr = U.current && U.screens[U.current];
+    nav.items = [];
+    if (!scr) return;
+    var list = scr.querySelectorAll(NAV_SEL);
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (e.disabled) continue;
+      var r = e.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) continue;
+      nav.items.push(e);
+    }
+  }
+
+  function navPaint() {
+    for (var i = 0; i < nav.items.length; i++) nav.items[i].classList.remove('navcur');
+    var cur = nav.items[nav.idx];
+    if (!cur) return;
+    cur.classList.add('navcur');
+    if (cur.scrollIntoView) {
+      cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }
+
+  U.navClear = function () {
+    for (var i = 0; i < nav.items.length; i++) nav.items[i].classList.remove('navcur');
+    nav.idx = -1;
+    nav.active = false;
+  };
+
+  /* Pick the item whose centre is nearest along `dir`, penalising sideways
+     drift so a column of buttons steps cleanly and a grid moves row by row. */
+  function navMove(dx, dy) {
+    navCollect();
+    if (!nav.items.length) return;
+    if (nav.idx < 0 || !nav.items[nav.idx]) { nav.idx = 0; nav.active = true; navPaint(); return; }
+    var from = nav.items[nav.idx].getBoundingClientRect();
+    var fx = from.left + from.width / 2, fy = from.top + from.height / 2;
+    var best = -1, bestScore = 1e9;
+    for (var i = 0; i < nav.items.length; i++) {
+      if (i === nav.idx) continue;
+      var r = nav.items[i].getBoundingClientRect();
+      var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      var along = (cx - fx) * dx + (cy - fy) * dy;
+      if (along <= 2) continue;
+      var side = Math.abs((cx - fx) * dy - (cy - fy) * dx);
+      var score = along + side * 2.6;
+      if (score < bestScore) { bestScore = score; best = i; }
+    }
+    if (best >= 0) { nav.idx = best; nav.active = true; navPaint(); }
+  }
+
+  function navActivate() {
+    var cur = nav.items[nav.idx];
+    if (!cur) { navMove(0, 1); return; }
+    cur.click();
+  }
+
+  /* Back / cancel: use the screen's own back button if it has one. */
+  function navBack() {
+    var scr = U.current && U.screens[U.current];
+    if (!scr) return false;
+    var b = scr.querySelector('.scr-head .btn.ghost');
+    if (b) { b.click(); return true; }
+    var foot = scr.querySelectorAll('.scr-foot .btn.ghost');
+    if (foot.length) { foot[foot.length - 1].click(); return true; }
+    return false;
+  }
+  U.navBack = navBack;
+
+  U.navKey = function (code) {
+    if (!U.current) return false;
+    switch (code) {
+      case 'ArrowUp': case 'KeyW': navMove(0, -1); return true;
+      case 'ArrowDown': case 'KeyS': navMove(0, 1); return true;
+      case 'ArrowLeft': case 'KeyA': navMove(-1, 0); return true;
+      case 'ArrowRight': case 'KeyD': navMove(1, 0); return true;
+      case 'Enter': case 'Space': case 'NumpadEnter':
+        if (nav.active) { navActivate(); return true; }
+        navMove(0, 1); return true;
+      case 'Backspace': case 'Escape': return navBack();
+    }
+    return false;
+  };
+
+  /* Gamepad: stick and d-pad step the cursor, A confirms, B goes back. */
+  var padRepeat = 0;
+  U.navPad = function (dt) {
+    if (!U.current || !navigator.getGamepads) return;
+    var gps = navigator.getGamepads();
+    var gp = null;
+    for (var i = 0; i < gps.length; i++) { if (gps[i] && gps[i].connected) { gp = gps[i]; break; } }
+    if (!gp) return;
+    padRepeat -= dt;
+    var ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+    var up = (gp.buttons[12] && gp.buttons[12].pressed) || ay < -0.55;
+    var dn = (gp.buttons[13] && gp.buttons[13].pressed) || ay > 0.55;
+    var lf = (gp.buttons[14] && gp.buttons[14].pressed) || ax < -0.55;
+    var rt = (gp.buttons[15] && gp.buttons[15].pressed) || ax > 0.55;
+    if (up || dn || lf || rt) {
+      if (padRepeat <= 0) {
+        padRepeat = nav.active ? 0.17 : 0.30;
+        navMove(rt ? 1 : (lf ? -1 : 0), dn ? 1 : (up ? -1 : 0));
+      }
+    } else { padRepeat = 0; }
+    var a = gp.buttons[0] && gp.buttons[0].pressed;
+    var b = gp.buttons[1] && gp.buttons[1].pressed;
+    if (a && !U._padA) navActivate();
+    if (b && !U._padB) navBack();
+    U._padA = a; U._padB = b;
+  };
+
   /* ================================ screens ============================== */
   U.screens = {};
   U.stack = [];
@@ -11270,12 +11965,17 @@ var DBZ = (function () {
   };
 
   U.show = function (id, opts) {
+    U.navClear();
     U.overlay.classList.add('show');
-    for (var k in U.screens) U.screens[k].classList.remove('on');
+    for (var k in U.screens) {
+      U.screens[k].classList.remove('on');
+      U.screens[k].classList.remove('hero');
+    }
     var s = U.screens[id];
     if (!s) return;
     s.classList.add('on');
     s.classList.toggle('clear', !!(opts && opts.clear));
+    s.classList.toggle('hero', !!(opts && opts.hero));
     U.current = id;
     s.scrollTop = 0;
     C.bus.emit('screen', { id: id });
@@ -11315,8 +12015,7 @@ var DBZ = (function () {
     var s = U.screens.title;
     clear(s);
     s.classList.add('clear');
-    var wrap = el('div');
-    wrap.style.cssText = 'margin:auto;text-align:center;padding:1em;';
+    var wrap = el('div', 'titleWrap');
 
     var logo = el('div', 'logo');
     logo.appendChild(el('span', 'l1', 'DRAGON BALL Z'));
@@ -11345,7 +12044,7 @@ var DBZ = (function () {
     });
     wrap.appendChild(menu);
     s.appendChild(wrap);
-    U.show('title', { clear: true });
+    U.show('title', { hero: true });
   };
 
   /* -------------------------------- modes --------------------------------- */
@@ -11488,9 +12187,16 @@ var DBZ = (function () {
       var c = R.get(state.pick);
       clear(detail);
       var left = el('div');
-      var pc = U.portrait(c, 220);
-      pc.style.cssText = 'width:100%;max-width:150px;border-radius:0.5em;display:block;margin:0 auto;';
-      left.appendChild(pc);
+      var frame = el('div', 'bigshot');
+      frame.style.background = 'radial-gradient(circle at 50% 36%, ' +
+        shade(c.aura, 0.08) + ', ' + shade(c.aura, -0.66) + ' 64%, #070b18 100%)';
+      var big = el('img');
+      big.alt = c.name;
+      frame.appendChild(big);
+      left.appendChild(frame);
+      if (C.Portrait) {
+        C.Portrait.request(c, function (url) { big.src = url; big.classList.add('in'); });
+      }
       var fav = el('button', 'btn ghost', (C.load().favorites.indexOf(c.id) >= 0 ? '★ Favourite' : '☆ Add favourite'));
       fav.style.cssText = 'margin-top:0.5em;width:100%;font-size:0.82em;';
       on(fav, function () {
@@ -11562,6 +12268,39 @@ var DBZ = (function () {
       if (G.previewCharacter) G.previewCharacter(c);
     }
 
+    /* Only tiles that are actually on screen ask for a render. Scrolling the
+       roster then costs nothing until you reach a card you can see. */
+    var io = null;
+    if (window.IntersectionObserver) {
+      io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          var t = en.target;
+          if (!en.isIntersecting) return;
+          io.unobserve(t);
+          var c = R.byId[t.dataset.cid];
+          var img = t.querySelector('img.shot');
+          if (c && img) fillShot(c, img);
+        });
+      }, { root: null, rootMargin: '320px 0px', threshold: 0.01 });
+    }
+
+    function fillShot(c, img) {
+      if (!C.Portrait) return;
+      C.Portrait.request(c, function (url) {
+        img.src = url;
+        img.classList.add('in');
+      });
+    }
+
+    function watchTile(tile, c, img) {
+      if (C.Portrait && C.Portrait.has(c.id)) {
+        img.src = C.Portrait.get(c.id);
+        img.classList.add('in');
+        return;
+      }
+      if (io) io.observe(tile); else fillShot(c, img);
+    }
+
     function renderGrid() {
       clear(grid);
       var list = state.era === 'fav'
@@ -11574,11 +12313,17 @@ var DBZ = (function () {
       list.forEach(function (c) {
         var tile = el('div', 'cha' + (c.id === state.pick ? ' sel' : ''));
         var art = el('div', 'art');
-        var cv = U.portrait(c, 128);
-        var img = cv.cloneNode(true);
-        img.getContext('2d').drawImage(cv, 0, 0);
+        /* the ki colour fills the card until the real render arrives, so the
+           grid is never a wall of grey boxes */
+        art.style.background = 'radial-gradient(circle at 50% 38%, ' +
+          shade(c.aura, 0.05) + ', ' + shade(c.aura, -0.62) + ' 62%, #080c1a 100%)';
+        var img = el('img', 'shot');
+        img.alt = c.short;
+        img.decoding = 'async';
         art.appendChild(img);
         tile.appendChild(art);
+        tile.dataset.cid = c.id;
+        watchTile(tile, c, img);
         tile.appendChild(el('div', 'era', c.era));
         if (c.forms.length) tile.appendChild(el('div', 'forms', '+' + c.forms.length));
         tile.appendChild(el('div', 'nm', c.short));
@@ -12117,7 +12862,9 @@ var DBZ = (function () {
     });
     G.renderer.setClearColor(0x05070f, 1);
     G.renderer.autoClear = true;
-    G.renderer.shadowMap.enabled = false;
+    G.renderer.shadowMap.enabled = !!S.shadows;
+    G.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    G.renderer.shadowMap.autoUpdate = true;
 
     G.scene = new THREE.Scene();
     G.camera = new THREE.PerspectiveCamera(58, 1, 0.35, 2400);
@@ -12191,7 +12938,11 @@ var DBZ = (function () {
     var S = C.S;
     FX.setQuality(S.quality);
     G.composer.enabled = !!S.bloom;
+    G.renderer.shadowMap.enabled = !!S.shadows;
     G.resize();
+    /* shadows and outlines are baked in at build time, so a live change
+       only takes full effect on the next match */
+    if (G.state === 'fight') C.UI.toast('Graphics applied — restart the fight to see all of it');
   };
 
   /* ============================== menu scene ============================= */
@@ -12214,7 +12965,7 @@ var DBZ = (function () {
     g.add(rim);
 
     var disc = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 5.2, 0.4, 40),
-      new THREE.MeshLambertMaterial({ color: 0x1a2444 }));
+      C.Build.mat(0x1a2444));
     disc.position.y = -0.2;
     g.add(disc);
     var ring = new THREE.Mesh(new THREE.TorusGeometry(4.8, 0.09, 6, 60),
@@ -12236,7 +12987,7 @@ var DBZ = (function () {
     f.pos.set(0, 0, 0);
     f.target = null;
     f.auraLevel = 0;
-    f.baseGlow = 0.30;
+    f.baseGlow = 0.50;
     G.menuGroup.add(f.group);
     f.setPose(C.POSE.stance, 999);
     f.syncTransform();
@@ -12305,7 +13056,7 @@ var DBZ = (function () {
     C.Audio.flushPending();
 
     var stageDef = C.stageById[cfg.stage] || C.STAGES[0];
-    G.arena = new C.Arena(G.scene, stageDef, { quality: C.S.quality });
+    G.arena = new C.Arena(G.scene, stageDef, { quality: C.S.quality, shadows: !!C.S.shadows });
     Mv.world = G.arena;
 
     var spawns = G.arena.spawnPoints();
@@ -12319,7 +13070,8 @@ var DBZ = (function () {
       var f = new C.Fighter(spec, {
         isPlayer: !!pc.human, side: i, team: i,
         hpScale: i === 0 ? cfg.hp1 : cfg.hp2,
-        shadows: false
+        shadows: !!C.S.shadows,
+        outlineWidth: C.S.quality === 'low' ? 0.0070 : 0.0080
       });
       f.hpScale = i === 0 ? cfg.hp1 : cfg.hp2;
       f.applyStats(f.hpScale);
@@ -12720,15 +13472,21 @@ var DBZ = (function () {
     }
 
     if (G.state === 'menu') {
+      if (U.current) U.navPad(raw);
       G.updateMenu(dt);
       FX.update(dt);
       G.render();
+      /* roster portraits render offscreen between frames, a couple at a
+         time, so opening the fighter list never stalls */
+      if (C.Portrait) C.Portrait.pump(G.renderer, 2);
       C.Input.endFrame();
       return;
     }
 
     if (G.paused) {
+      if (U.current) U.navPad(raw);
       G.render();
+      if (C.Portrait) C.Portrait.pump(G.renderer, 1);
       C.Input.endFrame();
       return;
     }
@@ -12780,7 +13538,15 @@ var DBZ = (function () {
 
     Mv.update(dt, G.arena);
     FX.update(dt);
-    if (G.arena) G.arena.update(dt, G.time);
+    if (G.arena) {
+      G.arena.update(dt, G.time);
+      if (G.fighters.length === 2) {
+        G.arena.followShadow(
+          (G.fighters[0].pos.x + G.fighters[1].pos.x) * 0.5,
+          (G.fighters[0].pos.y + G.fighters[1].pos.y) * 0.5,
+          (G.fighters[0].pos.z + G.fighters[1].pos.z) * 0.5);
+      }
+    }
 
     /* keep the two fighters from occupying the same space */
     if (G.fighters.length === 2) {
@@ -13279,8 +14045,29 @@ var DBZ = (function () {
       C.UI.title(C.Game);
       C.Game.previewCharacter(C.Roster.get(C.load().lastUsed || 'goku'));
 
-      /* deep links: ?char=goku&stage=namek&mode=versus  */
+      /* deep links: ?char=goku&stage=namek&mode=versus
+         ?screen=<id> jumps straight to a menu screen, which is how the
+         screenshot tooling checks menu layout without clicking through. */
       var q = C.qs;
+      if (q.screen) {
+        setTimeout(function () {
+          var G = C.Game, U = C.UI;
+          var jump = {
+            title: function () { U.title(G); },
+            modes: function () { U.modes(G); },
+            story: function () { U.story(G); },
+            fights: function () { U.fights(G, C.Levels.SAGAS[0]); },
+            select: function () { U.select(G, { browse: true }); },
+            pick: function () { G.pickMode('versus'); },
+            stage: function () { U.stage(G, function () { }, function () { }); },
+            settings: function () { U.settings(G); },
+            controls: function () { U.controls(G); },
+            pause: function () { U.pause(G); }
+          };
+          (jump[q.screen] || jump.title)();
+        }, 320);
+        return;
+      }
       if (q.mode || q.char) {
         setTimeout(function () {
           if (q.mode === 'story') { C.UI.story(C.Game); return; }

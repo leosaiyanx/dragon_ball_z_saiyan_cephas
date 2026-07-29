@@ -1,6 +1,6 @@
 /* Dragon Ball Z: Saiyan Cephas — offline-first service worker.
    Bump CACHE on every release or phones will keep serving the old build. */
-var CACHE = 'saiyan-cephas-v4';
+var CACHE = 'saiyan-cephas-v5';
 
 var ASSETS = [
   './',
@@ -19,6 +19,7 @@ var ASSETS = [
   './js/audio.js',
   './js/levels.js',
   './js/input.js',
+  './js/portrait.js',
   './js/ui.js',
   './js/game.js',
   './js/main.js',

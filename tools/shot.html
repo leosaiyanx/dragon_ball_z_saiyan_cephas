@@ -1,0 +1,122 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>shot harness</title>
+<style>
+  html,body{margin:0;height:100%;background:#05070f;overflow:hidden}
+  canvas{width:100%;height:100%;display:block}
+</style>
+<canvas id="gl"></canvas>
+<div id="hud"></div><div id="flash"></div><div id="splitLine"></div>
+<div id="vsCard"></div><div id="touch"></div><div id="overlay"></div>
+<div id="boot" style="display:none"><div id="bootText"></div><div id="bootBar"><i></i></div></div>
+<div id="rotate"></div>
+<script src="../js/three.min.js"></script>
+<script src="../js/core.js"></script>
+<script src="../js/roster.js"></script>
+<script src="../js/fx.js"></script>
+<script src="../js/build.js"></script>
+<script src="../js/anim.js"></script>
+<script src="../js/fighter.js"></script>
+<script src="../js/moves.js"></script>
+<script src="../js/ai.js"></script>
+<script src="../js/arena.js"></script>
+<script src="../js/audio.js"></script>
+<script src="../js/levels.js"></script>
+<script src="../js/input.js"></script>
+<script src="../js/ui.js"></script>
+<script src="../js/game.js"></script>
+<script>
+/* A deterministic staging page for headless screenshots.
+
+   ?ids=goku,vegeta      which fighters to line up
+   ?pose=stance          a named pose applied to all of them
+   ?poses=a,b,c          a pose each
+   ?clip=cross&t=0.36    freeze every fighter on one clip frame
+   ?form=1               transform each up to this form index
+   ?yaw=0.4  ?dist=      camera framing
+   ?stage=cellgames      render an actual arena instead of the void
+   ?aura=1               leave the ki aura switched on
+*/
+(function () {
+  function q(k, d) {
+    var m = new RegExp('[?&]' + k + '=([^&]*)').exec(location.search);
+    return m ? decodeURIComponent(m[1]) : d;
+  }
+  DBZ.load();
+  DBZ.S.shadows = q('shadows', '1') === '1';
+  DBZ.S.quality = q('quality', 'high');
+  DBZ.S.bloom = q('bloom', '1') === '1';
+  DBZ.UI.mount();
+  DBZ.Game.init(document.getElementById('gl'));
+  DBZ.UI.hide(); DBZ.UI.showHud(false);
+
+  var G = DBZ.Game;
+  var ids = q('ids', 'goku').split(',');
+  var poses = q('poses', '').split(',').filter(Boolean);
+  var pose = q('pose', 'stance');
+  var clip = q('clip', ''), ct = parseFloat(q('t', '0.36'));
+  var form = parseInt(q('form', '-1'), 10);
+  var yaw = parseFloat(q('yaw', '0.42'));
+  var gap = parseFloat(q('gap', '1.62'));
+  var aura = q('aura', '0') === '1';
+  var stage = q('stage', '');
+
+  if (stage) {
+    G.arena = new DBZ.Arena(G.scene, DBZ.stageById[stage] || DBZ.STAGES[0],
+      { quality: DBZ.S.quality, shadows: DBZ.S.shadows });
+    G.menuGroup.visible = false;
+  }
+
+  var row = [];
+  ids.forEach(function (id, i) {
+    var f = new DBZ.Fighter(DBZ.Roster.get(id), { side: 0, shadows: DBZ.S.shadows });
+    var px = (i - (ids.length - 1) / 2) * gap;
+    var py = G.arena ? G.arena.groundAt(px, 0) : 0;
+    f.pos.set(px, py, 0);
+    f.yaw = yaw; f.target = null;
+    if (!aura) { f.baseGlow = 0; f.aura.visible = false; f.auraCore.visible = false; }
+    if (form >= 0) { for (var k = 0; k <= form && k < f.spec.forms.length; k++) { f.ki = 100; f.transform(k); } }
+    var ow = parseFloat(q('ow', '-1'));
+    if (ow >= 0 && f.built.outlineMat) f.built.outlineMat.uniforms.uWidth.value = ow;
+    if (q('noline', '0') === '1' && f.built.outlines) {
+      f.built.outlines.forEach(function (o) { o.visible = false; });
+    }
+    (stage ? G.scene : G.menuGroup).add(f.group);
+    row.push(f);
+  });
+  window.__row = row;
+
+  var dist = parseFloat(q('dist', String(ids.length * gap * 0.60 + 1.85)));
+  var camY = parseFloat(q('camy', '1.02'));
+  var lookY = parseFloat(q('looky', '0.90'));
+
+  function stage1(dt) {
+    row.forEach(function (f, i) {
+      var p = poses.length ? (poses[i % poses.length] || pose) : pose;
+      if (clip) DBZ.Anim.sample(DBZ.Anim.CLIP[clip], ct, f.poseTarget);
+      else DBZ.Anim.copy(DBZ.Anim.POSE[p] || DBZ.Anim.POSE.stance, f.poseTarget);
+      f.poseBlend = 999; f.animT = 0.7;
+      if (aura) {
+        f.baseGlow = 1.2;
+        if (!f.warmAura) {
+          f.warmAura = 1; f.auraLevel = 1.5;
+          for (var w = 0; w < 40; w++) { f.updateAura(0.016); DBZ.FX.update(0.016); }
+        }
+        f.updateAura(dt);
+      }
+      f.applyPose(1); f.syncTransform();
+    });
+    if (G.arena) {
+      G.arena.followShadow(0, row[0] ? row[0].pos.y + 1 : 1, 0);
+      G.arena.update(0.016, 1.0);
+    }
+    var baseY = row[0] ? row[0].pos.y : 0;
+    G.camera.position.set(0, baseY + camY, dist);
+    G.camera.lookAt(0, baseY + lookY, 0);
+  }
+  G.updateMenu = stage1;
+  /* the arena path never calls updateMenu, so drive it from render instead */
+  var origRender = G.render;
+  G.render = function () { stage1(0.016); origRender(); };
+})();
+</script>

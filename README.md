@@ -89,6 +89,9 @@ Pick **2 Players** for split screen on one keyboard. Player 2 uses
 - **Story Mode** — 9 sagas, **50 fights**, from Raditz landing on Earth to the
   last stand against Jiren.
 - **Versus, 2-Player split screen, World Tournament, Survival and Training.**
+- **Cel-shaded like the show** — flat colour with a hard shadow terminator,
+  hand-tuned rim light, and black ink outlines round every fighter. Real
+  shadow maps ground them in the arena.
 - **Hand-keyframed animation** — every strike has anticipation, a fast
   contact frame and a follow-through, driven by a clip system rather than
   snapping between two poses. Hips and shoulders counter-rotate through a
@@ -113,6 +116,14 @@ Change it any time in Settings.
 Settings also has **assists** (auto-face target, hold-to-combo), graphics
 quality, glow, and volume. Everything saves automatically.
 
+## Getting around the menus
+
+Mouse, touch, keyboard and gamepad all work everywhere. Arrow keys or WASD
+move a gold cursor between buttons, Enter picks, Backspace or Escape goes
+back; on a gamepad that is the stick or d-pad, **A** and **B**. The roster
+tiles are rendered from the actual 3D models, so the fighter on the card is
+the fighter you get.
+
 ---
 
 ## For a grown-up: running it yourself
@@ -133,6 +144,7 @@ Other tools:
 | `python3 tools/make_icons.py` | Redraws the app icons (needs `pillow`) |
 | `python3 tools/make_qr.py <url> <out.png>` | Makes a QR code (needs `segno`) |
 | `python3 tools/make_poster.py` | Rebuilds `PRINT_ME.html` |
+| `tools/shot.sh out.png 'ids=goku&pose=stance'` | Headless screenshot of any fighter, pose, clip frame or stage — the Browser dev pane caches frames and lies, this does not |
 
 ## How it is built
 
@@ -141,7 +153,11 @@ framework, no npm. **Zero downloaded art or audio.** Every character is
 assembled at runtime from primitives described by a table of numbers; every
 sound is synthesised with the Web Audio API; the music is a step sequencer. The
 glow comes from a hand-written bloom pipeline (bright-pass, separable blur at
-two scales, composite with radial blur and vignette).
+two scales, composite with radial blur, vignette and a saturation/contrast
+grade). Fighters are cel-shaded with `MeshToonMaterial` over a stepped
+gradient map, plus a rim term patched into the shader, and outlined with an
+inverted hull that is baked down to one mesh per joint — 16 extra draw calls
+per fighter instead of 96. A whole fight scene is about 245 draw calls.
 
 | File | What lives there |
 |---|---|
@@ -149,6 +165,7 @@ two scales, composite with radial blur and vignette).
 | `js/roster.js` | All 79 fighters as data |
 | `js/build.js` | Turns a roster row into a posable 3D rig |
 | `js/anim.js` | The pose library and keyframed animation clips |
+| `js/portrait.js` | Renders roster tiles from the real 3D models |
 | `js/fighter.js` | Physics, resources, animation, the ki aura shader |
 | `js/moves.js` | Combos, projectiles, beams, beam struggles |
 | `js/ai.js` | Perception → reflexes → utility planning |

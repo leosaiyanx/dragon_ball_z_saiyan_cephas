@@ -26,7 +26,9 @@
     });
     G.renderer.setClearColor(0x05070f, 1);
     G.renderer.autoClear = true;
-    G.renderer.shadowMap.enabled = false;
+    G.renderer.shadowMap.enabled = !!S.shadows;
+    G.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    G.renderer.shadowMap.autoUpdate = true;
 
     G.scene = new THREE.Scene();
     G.camera = new THREE.PerspectiveCamera(58, 1, 0.35, 2400);
@@ -100,7 +102,11 @@
     var S = C.S;
     FX.setQuality(S.quality);
     G.composer.enabled = !!S.bloom;
+    G.renderer.shadowMap.enabled = !!S.shadows;
     G.resize();
+    /* shadows and outlines are baked in at build time, so a live change
+       only takes full effect on the next match */
+    if (G.state === 'fight') C.UI.toast('Graphics applied — restart the fight to see all of it');
   };
 
   /* ============================== menu scene ============================= */
@@ -123,7 +129,7 @@
     g.add(rim);
 
     var disc = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 5.2, 0.4, 40),
-      new THREE.MeshLambertMaterial({ color: 0x1a2444 }));
+      C.Build.mat(0x1a2444));
     disc.position.y = -0.2;
     g.add(disc);
     var ring = new THREE.Mesh(new THREE.TorusGeometry(4.8, 0.09, 6, 60),
@@ -145,7 +151,7 @@
     f.pos.set(0, 0, 0);
     f.target = null;
     f.auraLevel = 0;
-    f.baseGlow = 0.30;
+    f.baseGlow = 0.50;
     G.menuGroup.add(f.group);
     f.setPose(C.POSE.stance, 999);
     f.syncTransform();
@@ -214,7 +220,7 @@
     C.Audio.flushPending();
 
     var stageDef = C.stageById[cfg.stage] || C.STAGES[0];
-    G.arena = new C.Arena(G.scene, stageDef, { quality: C.S.quality });
+    G.arena = new C.Arena(G.scene, stageDef, { quality: C.S.quality, shadows: !!C.S.shadows });
     Mv.world = G.arena;
 
     var spawns = G.arena.spawnPoints();
@@ -228,7 +234,8 @@
       var f = new C.Fighter(spec, {
         isPlayer: !!pc.human, side: i, team: i,
         hpScale: i === 0 ? cfg.hp1 : cfg.hp2,
-        shadows: false
+        shadows: !!C.S.shadows,
+        outlineWidth: C.S.quality === 'low' ? 0.0070 : 0.0080
       });
       f.hpScale = i === 0 ? cfg.hp1 : cfg.hp2;
       f.applyStats(f.hpScale);
@@ -629,15 +636,21 @@
     }
 
     if (G.state === 'menu') {
+      if (U.current) U.navPad(raw);
       G.updateMenu(dt);
       FX.update(dt);
       G.render();
+      /* roster portraits render offscreen between frames, a couple at a
+         time, so opening the fighter list never stalls */
+      if (C.Portrait) C.Portrait.pump(G.renderer, 2);
       C.Input.endFrame();
       return;
     }
 
     if (G.paused) {
+      if (U.current) U.navPad(raw);
       G.render();
+      if (C.Portrait) C.Portrait.pump(G.renderer, 1);
       C.Input.endFrame();
       return;
     }
@@ -689,7 +702,15 @@
 
     Mv.update(dt, G.arena);
     FX.update(dt);
-    if (G.arena) G.arena.update(dt, G.time);
+    if (G.arena) {
+      G.arena.update(dt, G.time);
+      if (G.fighters.length === 2) {
+        G.arena.followShadow(
+          (G.fighters[0].pos.x + G.fighters[1].pos.x) * 0.5,
+          (G.fighters[0].pos.y + G.fighters[1].pos.y) * 0.5,
+          (G.fighters[0].pos.z + G.fighters[1].pos.z) * 0.5);
+      }
+    }
 
     /* keep the two fighters from occupying the same space */
     if (G.fighters.length === 2) {

@@ -107,6 +107,7 @@
     'uniform float strength; uniform float radial; uniform vec2 center;',
     'uniform float vignette; uniform float aberr; uniform float flashAmt;',
     'uniform vec3 flashCol; uniform float grade;',
+    'uniform float sat; uniform float contrast; uniform float lift;',
     'varying vec2 vUv;',
     'vec3 sampleBase(vec2 uv){',
     '  if (aberr < 0.001) return texture2D(tBase, uv).rgb;',
@@ -131,6 +132,12 @@
     '  vec3 col = base + bl * strength;',
     /* gentle filmic shoulder so nothing clips to flat white */
     '  col = col / (1.0 + col * grade);',
+    /* Anime cels are printed, not photographed: push saturation and pull the
+       midtones apart so flat colour fields stay distinct instead of drifting
+       into one another. Without this a whole stage reads as beige haze. */
+    '  float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));',
+    '  col = mix(vec3(lum), col, sat);',
+    '  col = clamp((col - 0.5) * contrast + 0.5 + lift, 0.0, 4.0);',
     '  float d = distance(vUv, vec2(0.5));',
     '  col *= 1.0 - vignette * smoothstep(0.35, 0.95, d);',
     '  col = mix(col, flashCol, flashAmt);',
@@ -177,7 +184,8 @@
         center: { value: new THREE.Vector2(0.5, 0.5) },
         vignette: { value: 0.42 }, aberr: { value: 0 },
         flashAmt: { value: 0 }, flashCol: { value: new THREE.Vector3(1, 1, 1) },
-        grade: { value: 0.09 }
+        grade: { value: 0.09 },
+        sat: { value: 1.22 }, contrast: { value: 1.10 }, lift: { value: -0.012 }
       }
     });
   }
@@ -595,15 +603,15 @@
 
   /* rising aura flames */
   FX.auraFlames = function (x, y, z, color, scale, intensity, dt) {
-    var n = 34 * intensity * dt * FX.rate;
+    var n = 62 * intensity * dt * FX.rate;
     var k = Math.floor(n) + (Math.random() < (n % 1) ? 1 : 0);
     for (var i = 0; i < k; i++) {
       var a = M.rand(0, M.PI2), r = M.rand(0, 0.55) * scale;
       FX.streaks.spawn({
         x: x + Math.cos(a) * r, y: y + M.rand(-0.7, 0.9) * scale, z: z + Math.sin(a) * r,
         vx: Math.cos(a) * 0.6, vy: M.rand(4, 9) * scale, vz: Math.sin(a) * 0.6,
-        life: M.rand(0.16, 0.34), drag: 1.2,
-        size: M.rand(0.5, 1.1) * scale, size1: 0.05,
+        life: M.rand(0.20, 0.42), drag: 1.1,
+        size: M.rand(0.55, 1.25) * scale, size1: 0.04,
         color: 0xffffff, boost: 2.4, color1: color, boost1: 3.0, fadeIn: 0.2
       });
     }

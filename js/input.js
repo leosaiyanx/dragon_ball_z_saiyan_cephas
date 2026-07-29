@@ -98,6 +98,8 @@
     window.addEventListener('keydown', function (e) {
       if (e.repeat) return;
       if (e.code === 'Tab' || e.code === 'Space' || e.code.indexOf('Arrow') === 0) e.preventDefault();
+      /* While a menu is open the keyboard drives the menu, not the fighter. */
+      if (C.UI && C.UI.current && C.UI.navKey(e.code)) { e.preventDefault(); return; }
       applyKey(e.code, true);
     }, { passive: false });
 
@@ -127,6 +129,10 @@
       I.wheel = (I.wheel || 0) + Math.sign(e.deltaY);
       e.preventDefault();
     }, { passive: false });
+
+    window.addEventListener('pointerdown', function () {
+      if (C.UI && C.UI.navClear) C.UI.navClear();
+    }, true);
 
     I.initTouch();
   };

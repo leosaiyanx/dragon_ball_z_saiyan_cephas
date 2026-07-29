@@ -39,8 +39,29 @@
       C.UI.title(C.Game);
       C.Game.previewCharacter(C.Roster.get(C.load().lastUsed || 'goku'));
 
-      /* deep links: ?char=goku&stage=namek&mode=versus  */
+      /* deep links: ?char=goku&stage=namek&mode=versus
+         ?screen=<id> jumps straight to a menu screen, which is how the
+         screenshot tooling checks menu layout without clicking through. */
       var q = C.qs;
+      if (q.screen) {
+        setTimeout(function () {
+          var G = C.Game, U = C.UI;
+          var jump = {
+            title: function () { U.title(G); },
+            modes: function () { U.modes(G); },
+            story: function () { U.story(G); },
+            fights: function () { U.fights(G, C.Levels.SAGAS[0]); },
+            select: function () { U.select(G, { browse: true }); },
+            pick: function () { G.pickMode('versus'); },
+            stage: function () { U.stage(G, function () { }, function () { }); },
+            settings: function () { U.settings(G); },
+            controls: function () { U.controls(G); },
+            pause: function () { U.pause(G); }
+          };
+          (jump[q.screen] || jump.title)();
+        }, 320);
+        return;
+      }
       if (q.mode || q.char) {
         setTimeout(function () {
           if (q.mode === 'story') { C.UI.story(C.Game); return; }
